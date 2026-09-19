@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Báo cáo bán hàng | Orbit</title>
+	<meta name="description" content="Báo cáo doanh thu và khách hàng từ file Excel năm 2026." />
+
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script>
+		tailwind.config = {
+			theme: {
+				extend: {
+					colors: {
+						ink: '#090A14',
+						panel: '#111321',
+						line: '#272A3B',
+						muted: '#9296AA',
+							primary: '#DF6B33',
+							mint: '#4FD1A8',
+							blue: '#61A8FF',
+							violet: '#9B8AFB'
+					}
+				}
+			}
+		};
+	</script>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+	<script src="https://unpkg.com/lucide@latest"></script>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+
+	<style>
+		:root { color-scheme: dark; }
+		body {
+			background:
+				radial-gradient(circle at 8% 0%, rgba(223, 107, 51, 0.09), transparent 28rem),
+				radial-gradient(circle at 94% 55%, rgba(97, 168, 255, 0.06), transparent 31rem),
+				#090A14;
+		}
+		.grid-overlay {
+			background-image: linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+			background-size: 44px 44px;
+			mask-image: linear-gradient(to bottom, black, transparent 80%);
+		}
+		.chart-wrap { position: relative; height: 300px; }
+		.small-chart-wrap { position: relative; height: 260px; }
+		.table-scroll { overflow-x: auto; }
+		.table-scroll::-webkit-scrollbar { height: 6px; }
+		.table-scroll::-webkit-scrollbar-thumb { background: #272A3B; border-radius: 999px; }
+		.metric-card { transition: border-color 160ms ease, transform 160ms ease; }
+		.metric-card:hover { border-color: rgba(223, 107, 51, 0.45); transform: translateY(-2px); }
+	</style>
+</head>
+
+<body class="min-h-screen overflow-x-hidden text-white antialiased">
+	<div class="pointer-events-none fixed inset-0 grid-overlay"></div>
+	<div class="relative min-h-screen lg:flex">
+		<aside class="hidden w-[248px] shrink-0 border-r border-line bg-[#0D0F1B]/90 lg:flex lg:flex-col">
+			<div class="flex h-[84px] items-center gap-3 border-b border-line px-6">
+				<img src="logologin.png" alt="Biểu tượng TIENHRM" class="h-9 w-9 object-contain" />
+				<span class="font-display text-xl font-bold tracking-[-0.03em]">TIENHRM</span>
+			</div>
+			<nav class="flex-1 space-y-1 px-3 py-6" aria-label="Điều hướng báo cáo">
+				<a href="#overview" class="flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-2.5 text-sm font-medium text-primary"><i data-lucide="layout-dashboard" class="h-[18px] w-[18px]" aria-hidden="true"></i>Tổng quan</a>
+				<a href="#sales" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted transition-colors hover:bg-white/[0.04] hover:text-white"><i data-lucide="shopping-bag" class="h-[18px] w-[18px]" aria-hidden="true"></i>Doanh thu</a>
+				<a href="#customers" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted transition-colors hover:bg-white/[0.04] hover:text-white"><i data-lucide="users" class="h-[18px] w-[18px]" aria-hidden="true"></i>Khách hàng</a>
+				<a href="#marketing" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted transition-colors hover:bg-white/[0.04] hover:text-white"><i data-lucide="megaphone" class="h-[18px] w-[18px]" aria-hidden="true"></i>Tiếp thị</a>
+			</nav>
+			<div class="border-t border-line p-4"><div class="flex items-center gap-3 rounded-xl bg-white/[0.03] p-3"><div class="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">MC</div><div><p class="text-sm font-medium text-white">Morgan Chen</p><p class="text-xs text-muted">Tài khoản quản trị</p></div></div></div>
+		</aside>
+
+		<main class="min-w-0 flex-1">
+			<header class="border-b border-line bg-[#0D0F1B]/70 px-5 py-5 backdrop-blur sm:px-8 lg:px-10">
+				<div class="mx-auto flex max-w-[1440px] items-center justify-between gap-5">
+					<div class="flex items-center gap-3 lg:hidden"><img src="logologin.png" alt="Biểu tượng TIENHRM" class="h-9 w-9 object-contain" /><span class="font-display text-lg font-bold">TIENHRM</span></div>
+					<div class="hidden lg:block"><p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Báo cáo theo dữ liệu nguồn</p><h1 class="mt-1 font-display text-2xl font-bold tracking-[-0.04em]">Báo cáo bán hàng 2026</h1></div>
+					<div class="flex items-center gap-2 sm:gap-3"><span class="hidden rounded-lg border border-line bg-panel px-3 py-2 text-xs text-muted sm:inline-flex">Tháng 1 - 7/2026</span><button type="button" aria-label="Thông báo" class="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-panel text-muted transition-colors hover:text-white"><i data-lucide="bell" class="h-[18px] w-[18px]" aria-hidden="true"></i></button><div class="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary lg:hidden">MC</div></div>
+				</div>
+			</header>
+
+			<div class="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 lg:px-10 lg:py-9">
+				<div class="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary lg:hidden">Báo cáo theo dữ liệu nguồn</p><h1 class="font-display text-2xl font-bold tracking-[-0.04em] lg:hidden">Báo cáo bán hàng 2026</h1><p class="mt-2 max-w-2xl text-sm leading-6 text-muted">Phân tích doanh thu và khách hàng từ <span class="text-slate-300">BAO CÁO KH +MH BÁN NHIỀU NĂM 2026.xlsx</span>.</p></div><button type="button" class="flex w-fit items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-orange-950/20 transition-colors hover:bg-orange-500"><i data-lucide="file-spreadsheet" class="h-4 w-4" aria-hidden="true"></i>Dữ liệu Excel</button></div>
+
+				<section id="overview" aria-labelledby="overview-title"><h2 id="overview-title" class="sr-only">Tóm tắt báo cáo</h2><div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+					<article class="metric-card rounded-xl border border-line bg-panel/90 p-5 shadow-panel"><div class="flex items-start justify-between"><div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><i data-lucide="banknote" class="h-[18px] w-[18px]" aria-hidden="true"></i></div><span class="text-xs text-muted">Tháng 1 - 7</span></div><p class="mt-5 text-sm text-muted">Tổng doanh thu</p><p class="mt-1 font-display text-2xl font-bold tracking-[-0.04em]" data-total-revenue>$17.93B</p><p class="mt-2 text-xs text-slate-500">Nguồn: báo cáo khách hàng</p></article>
+					<article class="metric-card rounded-xl border border-line bg-panel/90 p-5 shadow-panel"><div class="flex items-start justify-between"><div class="flex h-9 w-9 items-center justify-center rounded-lg bg-mint/10 text-mint"><i data-lucide="package" class="h-[18px] w-[18px]" aria-hidden="true"></i></div><span class="text-xs text-muted">Sản phẩm dẫn đầu</span></div><p class="mt-5 text-sm text-muted">Số lượng đã bán</p><p class="mt-1 font-display text-2xl font-bold tracking-[-0.04em]">61,433</p><p class="mt-2 truncate text-xs text-slate-500">DÂY HÀN MAG GM70S D0.8</p></article>
+					<article class="metric-card rounded-xl border border-line bg-panel/90 p-5 shadow-panel"><div class="flex items-start justify-between"><div class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue/10 text-blue"><i data-lucide="users" class="h-[18px] w-[18px]" aria-hidden="true"></i></div><span class="text-xs text-muted">Xếp theo tổng doanh thu</span></div><p class="mt-5 text-sm text-muted">Khách hàng trong báo cáo</p><p class="mt-1 font-display text-2xl font-bold tracking-[-0.04em]" data-customer-count>—</p><p class="mt-2 text-xs text-slate-500">Các bản ghi khách hàng</p></article>
+					<article class="metric-card rounded-xl border border-line bg-panel/90 p-5 shadow-panel"><div class="flex items-start justify-between"><div class="flex h-9 w-9 items-center justify-center rounded-lg bg-violet/10 text-violet"><i data-lucide="calendar-range" class="h-[18px] w-[18px]" aria-hidden="true"></i></div><span class="text-xs text-muted">Giai đoạn trong file</span></div><p class="mt-5 text-sm text-muted">Số tháng</p><p class="mt-1 font-display text-2xl font-bold tracking-[-0.04em]">7 tháng</p><p class="mt-2 text-xs text-slate-500">Từ tháng 1 đến tháng 7/2026</p></article>
+				</div></section>
+
+				<section id="sales" class="mt-9" aria-labelledby="sales-title"><div class="mb-4"><p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Doanh thu bán hàng</p><h2 id="sales-title" class="mt-1 font-display text-xl font-bold tracking-[-0.03em]">Doanh thu theo tháng từ giao dịch khách hàng</h2></div><div class="grid gap-5 xl:grid-cols-[1.55fr_1fr]">
+					<article class="rounded-xl border border-line bg-panel/90 p-5 shadow-panel sm:p-6"><div class="mb-5 flex items-start justify-between gap-4"><div><h3 class="font-display text-base font-semibold">Doanh thu theo tháng</h3><p class="mt-1 text-xs text-muted">Lấy từ dòng TỔNG trong báo cáo khách hàng</p></div><span class="text-xs text-muted">VND</span></div><div class="chart-wrap"><canvas id="revenueChart" aria-label="Doanh thu theo tháng từ tháng 1 đến tháng 7 năm 2026" role="img"></canvas></div></article>
+					<article class="rounded-xl border border-line bg-panel/90 p-5 shadow-panel sm:p-6"><div class="mb-5"><h3 class="font-display text-base font-semibold">Phân bổ doanh thu</h3><p class="mt-1 text-xs text-muted">Tỷ trọng trong tổng doanh thu bảy tháng</p></div><div class="small-chart-wrap"><canvas id="monthlyShareChart" aria-label="Phân bổ doanh thu theo tháng" role="img"></canvas></div></article>
+				</div></section>
+
+				<section class="mt-9" aria-labelledby="products-title"><div class="mb-4"><p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Sản phẩm bán chạy</p><h2 id="products-title" class="mt-1 font-display text-xl font-bold tracking-[-0.03em]">Các mặt hàng bán nhiều nhất</h2></div><div class="grid gap-5 xl:grid-cols-[1.3fr_1fr]">
+					<article class="rounded-xl border border-line bg-panel/90 p-5 shadow-panel sm:p-6"><div class="mb-5"><h3 class="font-display text-base font-semibold">10 sản phẩm theo số lượng</h3><p class="mt-1 text-xs text-muted">Tổng số lượng từ bảng bán chạy</p></div><div class="chart-wrap"><canvas id="productsChart" aria-label="10 sản phẩm theo số lượng bán" role="img"></canvas></div></article>
+					<article class="rounded-xl border border-line bg-panel/90 p-5 shadow-panel sm:p-6"><div class="mb-5"><h3 class="font-display text-base font-semibold">Xếp hạng sản phẩm</h3><p class="mt-1 text-xs text-muted">Tên sản phẩm và số lượng chính xác</p></div><div class="table-scroll"><table class="w-full min-w-[470px] text-left text-sm"><thead class="border-b border-line text-xs uppercase tracking-wider text-muted"><tr><th class="pb-3 font-medium">Sản phẩm</th><th class="pb-3 text-right font-medium">Số lượng</th></tr></thead><tbody id="productsTable" class="divide-y divide-line/70"></tbody></table></div></article>
+				</div></section>
+
+				<section id="customers" class="mt-9" aria-labelledby="customers-title"><div class="mb-4"><p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Báo cáo khách hàng</p><h2 id="customers-title" class="mt-1 font-display text-xl font-bold tracking-[-0.03em]">Khách hàng mua nhiều nhất</h2></div><div class="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+					<article class="rounded-xl border border-line bg-panel/90 p-5 shadow-panel sm:p-6"><div class="mb-5"><h3 class="font-display text-base font-semibold">Doanh thu theo khách hàng</h3><p class="mt-1 text-xs text-muted">Tổng giá trị mua từ báo cáo khách hàng</p></div><div class="chart-wrap"><canvas id="customersChart" aria-label="10 khách hàng theo doanh thu" role="img"></canvas></div></article>
+					<article class="rounded-xl border border-line bg-panel/90 p-5 shadow-panel sm:p-6"><div class="mb-5"><h3 class="font-display text-base font-semibold">Mức độ tập trung khách hàng</h3><p class="mt-1 text-xs text-muted">Tỷ trọng của nhóm khách hàng lớn</p></div><div class="small-chart-wrap"><canvas id="customerShareChart" aria-label="Mức độ tập trung doanh thu khách hàng" role="img"></canvas></div></article>
+				</div>
+				<div class="mt-5 rounded-xl border border-line bg-panel/90 p-5 shadow-panel sm:p-6"><div class="mb-5"><h3 class="font-display text-base font-semibold">Bảng doanh thu khách hàng</h3><p class="mt-1 text-xs text-muted">10 bản ghi theo tổng giá trị mua</p></div><div class="table-scroll"><table class="w-full min-w-[720px] text-left text-sm"><thead class="border-b border-line text-xs uppercase tracking-wider text-muted"><tr><th class="px-3 pb-3 font-medium">Hạng</th><th class="px-3 pb-3 font-medium">Khách hàng</th><th class="px-3 pb-3 font-medium">Tổng doanh thu</th><th class="px-3 pb-3 font-medium">Tỷ trọng</th></tr></thead><tbody id="customersTable" class="divide-y divide-line/70"></tbody></table></div></div>
+				</section>
+
+				<section id="marketing" class="mt-9" aria-labelledby="marketing-title"><div class="mb-4"><p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Trạng thái dữ liệu tiếp thị</p><h2 id="marketing-title" class="mt-1 font-display text-xl font-bold tracking-[-0.03em]">Khả dụng của số liệu tiếp thị</h2></div><article class="rounded-xl border border-dashed border-line bg-panel/70 p-6 sm:p-8"><div class="flex flex-col gap-5 sm:flex-row sm:items-start"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue/10 text-blue"><i data-lucide="database-zap" class="h-5 w-5" aria-hidden="true"></i></div><div><h3 class="font-display text-base font-semibold">Không tìm thấy bảng tiếp thị trong file nguồn</h3><p class="mt-2 max-w-3xl text-sm leading-6 text-muted">File Excel đã tải lên có báo cáo sản phẩm bán chạy và khách hàng mua nhiều, nhưng không có dữ liệu chiến dịch, kênh, chi phí, chuyển đổi hoặc doanh thu tiếp thị. Phần này không hiển thị số liệu tự tạo. Hãy thêm bảng tiếp thị vào file Excel để bật các biểu đồ chiến dịch.</p><span class="mt-4 inline-flex items-center gap-2 rounded-full bg-blue/10 px-3 py-1.5 text-xs font-medium text-blue"><i data-lucide="file-question" class="h-3.5 w-3.5" aria-hidden="true"></i>Đang chờ dữ liệu nguồn</span></div></div></article></section>
+
+				<footer class="py-10 text-center text-xs text-slate-600">Nguồn: BAO CÁO KH +MH BÁN NHIỀU NĂM 2026.xlsx · Giai đoạn dữ liệu: tháng 1 - tháng 7/2026</footer>
+			</div>
+		</main>
+	</div>
+
+	<script>
+		lucide.createIcons();
+		const currency = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+		const compactCurrency = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+		const totalRevenue = 17933654788;
+		const months = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7'];
+		const monthlyRevenue = [2324560383, 1104133094, 2782687143, 2721186261, 2637447784, 2757123620, 3606516503];
+		const products = [
+			['DÂY HÀN MAG GM70S D0.8 GEMINI - RL250', 61433], ['DÂY HÀN 70S 1.2 MM RL250', 22620], ['DÂY HÀN LÕI THUỐC KF-71T 1.2MM (KT)', 19935], ['ĐÁ CẮT 107.1,2.16 HẢI DƯƠNG XANH (50v/1hộp)', 9210], ['DÂY HÀN MAG GM70S D1.0 GEMINI - RL250 250KG/THÙNG', 9000], ['NHÁM XẾP 100 A60 NẮP LƯỚI KALES', 8822], ['DÂY HÀN 70S 1.0 MM RL250', 8520], ['DÂY HÀN MAG GM70S D0.9 GEMINI RL250', 6340.2], ['NHÁM XẾP 100 A40 NẮP LƯỚI KALES', 5640], ['DÂY HÀN MAG GM70S D1.0 GEMINI - RL250 125KG/THÙNG', 5000]
+		];
+		const customers = [
+			['CÔNG TY CỔ PHẦN GIA CÔNG CƠ KHÍ PROSIMEX', 1589465140], ['CÔNG TY CỔ PHẦN THƯƠNG MẠI CƠ KHÍ XÂY DỰNG GIA PHÁT', 1123435107], ['CÔNG TY TNHH GIA CÔNG CƠ KHÍ QUỐC PHONG KANGYAN', 896162880], ['GIÀN GIÁO TÙNG LÂM', 834192770], ['CÔNG TY TNHH SẢN XUẤT DỊCH VỤ THƯƠNG MẠI THIẾT BỊ VÀ XÂY DỰNG RAINBOW', 701828850], ['CÔNG TY TNHH SHIRONG (VIỆT NAM)', 650849105], ['CÔNG TY TNHH 72 ĐẠI NGHĨA', 618235855], ['CÔNG TY CỔ PHẦN SẢN XUẤT THƯƠNG MẠI THIẾT BỊ VÀ XÂY DỰNG BẢO LIÊN', 569178336], ['CHÚ TỶ GIAO CAMPUCHIA', 477401000], ['CÔNG TY TNHH DỊCH VỤ THƯƠNG MẠI VÀ VẬN TẢI VIỆT HẢI', 410740751]
+		];
+		document.querySelector('[data-total-revenue]').textContent = compactCurrency.format(totalRevenue) + ' VND';
+		document.querySelector('[data-customer-count]').textContent = customers.length + ' khách hàng dẫn đầu';
+		document.getElementById('productsTable').innerHTML = products.map(([name, value], index) => `<tr><td class="max-w-[350px] truncate py-3 text-slate-300" title="${name}">${index + 1}. ${name}</td><td class="py-3 text-right font-medium text-white">${currency.format(value)}</td></tr>`).join('');
+		document.getElementById('customersTable').innerHTML = customers.map(([name, value], index) => `<tr><td class="px-3 py-3 text-muted">${index + 1}</td><td class="max-w-[420px] truncate px-3 py-3 text-slate-300" title="${name}">${name}</td><td class="px-3 py-3 font-medium text-white">${currency.format(value)} VND</td><td class="px-3 py-3 text-mint">${((value / totalRevenue) * 100).toFixed(1)}%</td></tr>`).join('');
+
+		Chart.defaults.color = '#9296AA';
+		Chart.defaults.font.family = 'Inter, sans-serif';
+		Chart.defaults.font.size = 11;
+		const gridColor = 'rgba(146, 150, 170, 0.12)';
+		const tooltipStyle = { backgroundColor: '#1A1D2D', borderColor: '#272A3B', borderWidth: 1, titleColor: '#FFFFFF', bodyColor: '#9296AA', padding: 12, cornerRadius: 8 };
+		const axis = { grid: { color: gridColor }, ticks: { callback: (value) => compactCurrency.format(value) } };
+
+		new Chart(document.getElementById('revenueChart'), { type: 'line', data: { labels: months, datasets: [{ label: 'Doanh thu', data: monthlyRevenue, borderColor: '#DF6B33', backgroundColor: 'rgba(223, 107, 51, 0.13)', fill: true, tension: 0.35, pointRadius: 4, pointBackgroundColor: '#DF6B33', pointBorderColor: '#111321', pointBorderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { ...tooltipStyle, callbacks: { label: (context) => ' ' + currency.format(context.raw) + ' VND' } } }, scales: { x: { grid: { display: false } }, y: axis } } });
+		new Chart(document.getElementById('monthlyShareChart'), { type: 'doughnut', data: { labels: months, datasets: [{ data: monthlyRevenue, backgroundColor: ['#DF6B33', '#61A8FF', '#4FD1A8', '#9B8AFB', '#E5A85B', '#D36E9A', '#4B5068'], borderWidth: 0, hoverOffset: 5 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', padding: 12, boxWidth: 7 } }, tooltip: { ...tooltipStyle, callbacks: { label: (context) => ' ' + currency.format(context.raw) + ' VND' } } } } });
+		new Chart(document.getElementById('productsChart'), { type: 'bar', data: { labels: products.map(([name]) => name.length > 25 ? name.slice(0, 25) + '...' : name), datasets: [{ label: 'Số lượng bán', data: products.map(([, value]) => value), backgroundColor: '#4FD1A8', borderRadius: 4, borderSkipped: false, barThickness: 16 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { ...tooltipStyle, callbacks: { label: (context) => ' ' + currency.format(context.raw) + ' sản phẩm' } } }, scales: { x: { ...axis, beginAtZero: true }, y: { grid: { display: false }, ticks: { font: { size: 10 } } } } } });
+		new Chart(document.getElementById('customersChart'), { type: 'bar', data: { labels: customers.map(([name]) => name.length > 22 ? name.slice(0, 22) + '...' : name), datasets: [{ label: 'Doanh thu', data: customers.map(([, value]) => value), backgroundColor: '#61A8FF', borderRadius: 4, borderSkipped: false, barThickness: 17 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { ...tooltipStyle, callbacks: { label: (context) => ' ' + currency.format(context.raw) + ' VND' } } }, scales: { x: { ...axis, beginAtZero: true }, y: { grid: { display: false }, ticks: { font: { size: 10 } } } } } });
+		new Chart(document.getElementById('customerShareChart'), { type: 'doughnut', data: { labels: ['Nhóm 1', 'Nhóm 2-3', 'Nhóm 4-10', 'Khách hàng còn lại'], datasets: [{ data: [customers[0][1], customers[1][1] + customers[2][1], customers.slice(3).reduce((sum, [, value]) => sum + value, 0), totalRevenue - customers.reduce((sum, [, value]) => sum + value, 0)], backgroundColor: ['#DF6B33', '#61A8FF', '#4FD1A8', '#4B5068'], borderWidth: 0, hoverOffset: 5 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', padding: 12, boxWidth: 7 } }, tooltip: { ...tooltipStyle, callbacks: { label: (context) => ' ' + currency.format(context.raw) + ' VND' } } } } });
+	</script>
+</body>
+</html>

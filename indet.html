@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Thư viện nhân sự | TIENHRM</title>
+	<meta name="description" content="Thư viện nhân sự TIENHRM: quy trình, quy chế, thông báo và biểu mẫu nội bộ." />
+
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script>
+		tailwind.config = {
+			theme: {
+				extend: {
+					colors: {
+						ink: '#090A14',
+						panel: '#111321',
+						line: '#272A3B',
+						muted: '#9296AA',
+							primary: '#DF6B33',
+							mint: '#4FD1A8',
+							blue: '#61A8FF',
+							violet: '#9B8AFB'
+					},
+					fontFamily: {
+						sans: ['Inter', 'sans-serif'],
+						display: ['Poppins', 'sans-serif']
+					},
+					boxShadow: {
+						glow: '0 0 0 1px rgba(223, 107, 51, 0.12), 0 24px 70px rgba(0, 0, 0, 0.35)'
+					}
+				}
+			}
+		};
+	</script>
+	<script src="https://unpkg.com/lucide@latest"></script>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+
+	<style>
+		:root { color-scheme: dark; }
+		body {
+			background:
+				radial-gradient(circle at 12% 0%, rgba(223, 107, 51, 0.12), transparent 30rem),
+				radial-gradient(circle at 92% 32%, rgba(97, 168, 255, 0.07), transparent 28rem),
+				#090A14;
+		}
+		.grid-overlay {
+			background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+			background-size: 44px 44px;
+			mask-image: linear-gradient(to bottom, black, transparent 72%);
+		}
+		.category-card { transition: border-color 160ms ease, transform 160ms ease, background-color 160ms ease; }
+		.category-card:hover { border-color: rgba(223, 107, 51, 0.55); background-color: rgba(17, 19, 33, 0.96); transform: translateY(-3px); }
+		.category-card:hover .category-icon { transform: scale(1.06); }
+		.category-icon { transition: transform 160ms ease; }
+		.search-field:focus-within { border-color: #DF6B33; box-shadow: 0 0 0 3px rgba(223, 107, 51, 0.13); }
+		[hidden] { display: none; }
+	</style>
+</head>
+
+<body class="min-h-screen overflow-x-hidden text-white antialiased">
+	<div class="pointer-events-none fixed inset-0 grid-overlay"></div>
+
+	<header class="relative border-b border-line/80 bg-[#0D0F1B]/70 backdrop-blur">
+		<div class="mx-auto flex max-w-[1240px] items-center justify-between gap-5 px-5 py-4 sm:px-8 lg:px-10">
+			<a href="indet.html" class="flex items-center gap-3" aria-label="Trang chủ TIENHRM">
+				<img src="logologin.png" alt="Biểu tượng TIENHRM" class="h-10 w-10 object-contain" />
+				<span class="font-display text-xl font-bold tracking-[-0.03em]">TIENHRM</span>
+			</a>
+			<nav class="hidden items-center gap-7 text-sm text-muted md:flex" aria-label="Điều hướng chính">
+				<a href="#thu-vien" class="transition-colors hover:text-white">Thư viện</a>
+				<a href="#huong-dan" class="transition-colors hover:text-white">Hướng dẫn</a>
+				<a href="#lien-he" class="transition-colors hover:text-white">Liên hệ</a>
+			</nav>
+			<div class="flex items-center gap-2 sm:gap-3">
+				<a href="login.html" class="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:text-white sm:inline-flex">Đăng nhập</a>
+				<a href="@register.html" class="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-orange-950/20 transition-colors hover:bg-orange-500"><i data-lucide="user-plus" class="h-4 w-4" aria-hidden="true"></i>Đăng ký</a>
+				<button id="mobile-menu-button" type="button" aria-label="Mở menu điều hướng" aria-expanded="false" class="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-panel text-muted transition-colors hover:text-white md:hidden"><i id="mobile-menu-icon" data-lucide="menu" class="h-[18px] w-[18px]"></i></button>
+			</div>
+		</div>
+		<nav id="mobile-menu" aria-label="Điều hướng trên điện thoại" class="mx-auto hidden max-w-[1240px] border-t border-line px-5 py-3 sm:px-8 md:hidden">
+			<div class="grid gap-1 text-sm text-muted">
+				<a href="#thu-vien" class="rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.04] hover:text-white">Thư viện</a>
+				<a href="#huong-dan" class="rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.04] hover:text-white">Hướng dẫn</a>
+				<a href="#lien-he" class="rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.04] hover:text-white">Liên hệ</a>
+				<a href="login.html" class="rounded-lg px-3 py-2.5 font-medium text-primary transition-colors hover:bg-primary/10">Đăng nhập</a>
+			</div>
+		</nav>
+	</header>
+
+	<main class="relative">
+		<section class="mx-auto max-w-[1240px] px-5 pb-14 pt-14 sm:px-8 sm:pt-20 lg:px-10 lg:pb-20">
+			<div class="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:gap-20">
+				<div>
+					<div class="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><i data-lucide="sparkles" class="h-3.5 w-3.5" aria-hidden="true"></i>Không gian nội bộ TIENHRM</div>
+					<h1 class="max-w-3xl font-display text-4xl font-bold leading-[1.12] tracking-[-0.055em] text-white sm:text-5xl lg:text-[58px]">Mọi quy trình nhân sự, <span class="text-primary">một nơi để tra cứu.</span></h1>
+					<p class="mt-6 max-w-2xl text-base leading-7 text-muted sm:text-lg">Thư viện nội bộ giúp bạn nhanh chóng tìm thấy quy trình, quy chế, thông báo và biểu mẫu cần thiết trong công việc hằng ngày.</p>
+					<div class="mt-8 flex flex-col gap-3 sm:flex-row">
+						<a href="login.html" class="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-lg shadow-orange-950/25 transition-colors hover:bg-orange-500 sm:w-auto"><i data-lucide="log-in" class="h-[18px] w-[18px]" aria-hidden="true"></i>Đăng nhập để tra cứu</a>
+						<a href="@register.html" class="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-line bg-panel/80 px-5 text-sm font-semibold text-slate-200 transition-colors hover:border-slate-500 hover:text-white sm:w-auto"><i data-lucide="user-plus" class="h-[18px] w-[18px]" aria-hidden="true"></i>Tạo tài khoản</a>
+					</div>
+					<div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-muted"><span class="flex items-center gap-2"><i data-lucide="shield-check" class="h-4 w-4 text-mint" aria-hidden="true"></i>Tài liệu được chuẩn hóa</span><span class="flex items-center gap-2"><i data-lucide="clock-3" class="h-4 w-4 text-blue" aria-hidden="true"></i>Cập nhật theo thông báo mới</span></div>
+				</div>
+
+				<div class="relative">
+					<div class="absolute -inset-8 rounded-[2rem] bg-primary/10 blur-3xl"></div>
+					<div class="relative rounded-2xl border border-line bg-panel/90 p-6 shadow-glow sm:p-8">
+						<div class="flex items-start justify-between gap-5 border-b border-line pb-6"><div><p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Tổng quan thư viện</p><h2 class="mt-2 font-display text-2xl font-bold tracking-[-0.04em]">Tra cứu dễ dàng</h2></div><div class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><i data-lucide="library" class="h-5 w-5" aria-hidden="true"></i></div></div>
+						<div class="grid grid-cols-2 gap-3 py-6"><div class="rounded-xl border border-line bg-ink/70 p-4"><p class="text-2xl font-bold text-white">04</p><p class="mt-1 text-xs leading-5 text-muted">Nhóm tài liệu chính</p></div><div class="rounded-xl border border-line bg-ink/70 p-4"><p class="text-2xl font-bold text-white">24/7</p><p class="mt-1 text-xs leading-5 text-muted">Truy cập khi cần</p></div><div class="rounded-xl border border-line bg-ink/70 p-4"><p class="text-2xl font-bold text-white">01</p><p class="mt-1 text-xs leading-5 text-muted">Nguồn thông tin tập trung</p></div><div class="rounded-xl border border-line bg-ink/70 p-4"><p class="text-2xl font-bold text-white">100%</p><p class="mt-1 text-xs leading-5 text-muted">Dành cho nội bộ</p></div></div>
+						<div class="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"><i data-lucide="arrow-up-right" class="h-[18px] w-[18px]" aria-hidden="true"></i></div><p class="text-sm leading-5 text-slate-300">Bắt đầu với tài khoản của bạn để xem nội dung đầy đủ.</p></div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section id="thu-vien" class="border-y border-line/70 bg-[#0D0F1B]/55">
+			<div class="mx-auto max-w-[1240px] px-5 py-14 sm:px-8 lg:px-10 lg:py-18">
+				<div class="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Nội dung được sắp xếp</p><h2 class="mt-2 font-display text-2xl font-bold tracking-[-0.04em] sm:text-3xl">Khám phá thư viện</h2><p class="mt-3 max-w-2xl text-sm leading-6 text-muted">Chọn đúng nhóm tài liệu để tiết kiệm thời gian và làm việc nhất quán hơn.</p></div><div class="search-field flex h-11 w-full items-center gap-3 rounded-lg border border-line bg-ink px-3.5 transition-colors sm:max-w-[280px]"><i data-lucide="search" class="h-[18px] w-[18px] shrink-0 text-muted" aria-hidden="true"></i><input id="library-search" type="search" placeholder="Tìm trong thư viện..." aria-label="Tìm trong thư viện" class="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-600" /></div></div>
+				<div id="category-grid" class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+					<a href="#quy-trinh" class="category-card rounded-xl border border-line bg-panel/75 p-5" data-search="quy trình hướng dẫn thực hiện công việc"><div class="category-icon flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><i data-lucide="route" class="h-5 w-5" aria-hidden="true"></i></div><h3 class="mt-5 font-display text-base font-semibold">Quy trình</h3><p class="mt-2 text-sm leading-6 text-muted">Các bước thực hiện công việc rõ ràng, thống nhất và dễ áp dụng.</p><span class="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-primary">Xem danh mục <i data-lucide="arrow-up-right" class="h-3.5 w-3.5" aria-hidden="true"></i></span></a>
+					<a href="#quy-che" class="category-card rounded-xl border border-line bg-panel/75 p-5" data-search="quy chế quy định chính sách nội bộ"><div class="category-icon flex h-11 w-11 items-center justify-center rounded-xl bg-blue/10 text-blue"><i data-lucide="scale" class="h-5 w-5" aria-hidden="true"></i></div><h3 class="mt-5 font-display text-base font-semibold">Quy chế</h3><p class="mt-2 text-sm leading-6 text-muted">Các quy định và chính sách làm nền tảng cho môi trường làm việc.</p><span class="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-blue">Xem danh mục <i data-lucide="arrow-up-right" class="h-3.5 w-3.5" aria-hidden="true"></i></span></a>
+					<a href="#thong-bao" class="category-card rounded-xl border border-line bg-panel/75 p-5" data-search="thông báo tin tức cập nhật nội bộ"><div class="category-icon flex h-11 w-11 items-center justify-center rounded-xl bg-mint/10 text-mint"><i data-lucide="megaphone" class="h-5 w-5" aria-hidden="true"></i></div><h3 class="mt-5 font-display text-base font-semibold">Thông báo</h3><p class="mt-2 text-sm leading-6 text-muted">Thông tin mới nhất từ công ty và các cập nhật cần lưu ý.</p><span class="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-mint">Xem danh mục <i data-lucide="arrow-up-right" class="h-3.5 w-3.5" aria-hidden="true"></i></span></a>
+					<a href="#bieu-mau" class="category-card rounded-xl border border-line bg-panel/75 p-5" data-search="biểu mẫu tài liệu tải xuống hồ sơ"><div class="category-icon flex h-11 w-11 items-center justify-center rounded-xl bg-violet/10 text-violet"><i data-lucide="files" class="h-5 w-5" aria-hidden="true"></i></div><h3 class="mt-5 font-display text-base font-semibold">Biểu mẫu</h3><p class="mt-2 text-sm leading-6 text-muted">Mẫu biểu sẵn sàng để sử dụng trong các nghiệp vụ thường ngày.</p><span class="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-violet">Xem danh mục <i data-lucide="arrow-up-right" class="h-3.5 w-3.5" aria-hidden="true"></i></span></a>
+				</div>
+				<p id="empty-search" hidden class="mt-8 text-center text-sm text-muted">Không tìm thấy nhóm tài liệu phù hợp.</p>
+			</div>
+		</section>
+
+		<section id="huong-dan" class="mx-auto max-w-[1240px] px-5 py-14 sm:px-8 lg:px-10 lg:py-20"><div class="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start"><div><p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Bắt đầu nhanh</p><h2 class="mt-2 max-w-md font-display text-2xl font-bold tracking-[-0.04em] sm:text-3xl">Tìm thông tin bạn cần trong vài bước.</h2><p class="mt-4 max-w-md text-sm leading-6 text-muted">TIENHRM giúp giảm thời gian hỏi lại, tìm kiếm rời rạc và sử dụng nhầm tài liệu cũ.</p></div><div class="grid gap-4 sm:grid-cols-3"><div class="border-l border-line pl-4"><span class="text-sm font-bold text-primary">01</span><h3 class="mt-4 font-display text-base font-semibold">Đăng nhập</h3><p class="mt-2 text-sm leading-6 text-muted">Sử dụng tài khoản nội bộ để truy cập thư viện.</p></div><div class="border-l border-line pl-4"><span class="text-sm font-bold text-primary">02</span><h3 class="mt-4 font-display text-base font-semibold">Chọn danh mục</h3><p class="mt-2 text-sm leading-6 text-muted">Đi đến nhóm quy trình, quy chế, thông báo hoặc biểu mẫu.</p></div><div class="border-l border-line pl-4"><span class="text-sm font-bold text-primary">03</span><h3 class="mt-4 font-display text-base font-semibold">Áp dụng</h3><p class="mt-2 text-sm leading-6 text-muted">Tra cứu phiên bản mới nhất cho công việc của bạn.</p></div></div></div></section>
+
+		<section id="lien-he" class="border-t border-line/70 bg-[#0D0F1B]/55"><div class="mx-auto flex max-w-[1240px] flex-col justify-between gap-6 px-5 py-10 sm:px-8 md:flex-row md:items-center lg:px-10"><div><p class="font-display text-lg font-semibold">Cần hỗ trợ?</p><p class="mt-2 text-sm text-muted">Liên hệ bộ phận nhân sự để được hướng dẫn về tài liệu và quy trình.</p></div><a href="mailto:hr@tienhrm.local" class="inline-flex w-fit items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-orange-300"><i data-lucide="mail" class="h-4 w-4" aria-hidden="true"></i>Liên hệ bộ phận nhân sự</a></div></section>
+	</main>
+
+	<footer class="relative border-t border-line bg-[#090A14] px-5 py-6 sm:px-8 lg:px-10"><div class="mx-auto flex max-w-[1240px] flex-col justify-between gap-3 text-xs text-slate-600 sm:flex-row"><span>© 2026 TIENHRM · Thư viện nhân sự nội bộ</span><span>Thông tin dành cho nhân sự công ty</span></div></footer>
+
+	<script>
+		lucide.createIcons();
+		const mobileMenuButton = document.getElementById('mobile-menu-button');
+		const mobileMenu = document.getElementById('mobile-menu');
+		const mobileMenuIcon = document.getElementById('mobile-menu-icon');
+		mobileMenuButton.addEventListener('click', () => {
+			const isOpen = mobileMenuButton.getAttribute('aria-expanded') === 'true';
+			mobileMenuButton.setAttribute('aria-expanded', String(!isOpen));
+			mobileMenuButton.setAttribute('aria-label', isOpen ? 'Mở menu điều hướng' : 'Đóng menu điều hướng');
+			mobileMenu.hidden = isOpen;
+			mobileMenu.classList.toggle('hidden', isOpen);
+			mobileMenuIcon.setAttribute('data-lucide', isOpen ? 'menu' : 'x');
+			mobileMenuIcon.outerHTML = '<i id="mobile-menu-icon" data-lucide="' + (isOpen ? 'menu' : 'x') + '" class="h-[18px] w-[18px]"></i>';
+			lucide.createIcons();
+		});
+		document.querySelectorAll('#mobile-menu a').forEach((link) => {
+			link.addEventListener('click', () => {
+				mobileMenuButton.setAttribute('aria-expanded', 'false');
+				mobileMenuButton.setAttribute('aria-label', 'Mở menu điều hướng');
+				mobileMenu.hidden = true;
+				mobileMenu.classList.add('hidden');
+			});
+		});
+
+		const searchInput = document.getElementById('library-search');
+		const categoryCards = [...document.querySelectorAll('[data-search]')];
+		const emptySearch = document.getElementById('empty-search');
+		searchInput.addEventListener('input', () => {
+			const query = searchInput.value.trim().toLowerCase();
+			let visibleCount = 0;
+			categoryCards.forEach((card) => {
+				const matches = !query || card.dataset.search.includes(query);
+				card.hidden = !matches;
+				if (matches) visibleCount += 1;
+			});
+			emptySearch.hidden = visibleCount > 0;
+		});
+	</script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Đăng nhập | Orbit</title>
+	<meta name="description" content="Đăng nhập vào tài khoản Orbit của bạn." />
+
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script>
+		tailwind.config = {
+			theme: {
+				extend: {
+					colors: {
+						ink: '#090A14',
+						panel: '#111321',
+						line: '#272A3B',
+						muted: '#9296AA',
+						primary: '#DF6B33'
+					},
+					fontFamily: {
+						sans: ['Inter', 'sans-serif'],
+						display: ['Poppins', 'sans-serif']
+					},
+					boxShadow: {
+						glow: '0 0 0 1px rgba(223, 107, 51, 0.12), 0 24px 70px rgba(0, 0, 0, 0.35)'
+					}
+				}
+			}
+		};
+	</script>
+	<script src="https://unpkg.com/lucide@latest"></script>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+
+	<style>
+		body {
+			background:
+				radial-gradient(circle at 12% 10%, rgba(223, 107, 51, 0.09), transparent 27rem),
+				radial-gradient(circle at 88% 85%, rgba(90, 86, 170, 0.09), transparent 28rem),
+				#090A14;
+		}
+
+		.grid-overlay {
+			background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+				linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+			background-size: 42px 42px;
+			mask-image: linear-gradient(to bottom, black, transparent 75%);
+		}
+
+		.field:focus-within {
+			border-color: #DF6B33;
+			box-shadow: 0 0 0 3px rgba(223, 107, 51, 0.13);
+		}
+
+		.provider-button:hover .provider-icon {
+			transform: translateY(-1px);
+		}
+
+		.provider-icon {
+			transition: transform 160ms ease;
+		}
+	</style>
+</head>
+
+<body class="min-h-screen overflow-x-hidden text-white antialiased">
+	<div class="pointer-events-none fixed inset-0 grid-overlay"></div>
+
+	<main class="relative flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
+		<section class="w-full max-w-[460px]">
+			<div class="mb-8 flex items-center justify-center gap-3">
+				<img src="logologin.png" alt="Biểu tượng TIENHRM" class="h-10 w-10 object-contain" />
+				<span class="font-display text-xl font-bold tracking-[-0.03em]">TIENHRM</span>
+			</div>
+
+			<div class="rounded-2xl border border-line bg-panel/95 p-6 shadow-glow backdrop-blur sm:p-10">
+				<div class="mb-8 text-center">
+					<p class="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">Chào mừng trở lại</p>
+					<h1 class="font-display text-3xl font-bold tracking-[-0.04em] text-white sm:text-[34px]">Đăng nhập vào tài khoản</h1>
+					<p class="mt-3 text-sm leading-6 text-muted">Tiếp tục công việc của bạn ngay từ nơi đã dừng lại.</p>
+				</div>
+
+				<form id="login-form" class="space-y-5" action="#" method="post" novalidate>
+					<div>
+						<label for="email" class="mb-2 block text-sm font-medium text-slate-200">Địa chỉ email</label>
+						<div id="email-field" class="field flex h-12 items-center gap-3 rounded-lg border border-line bg-ink px-4 transition-colors">
+							<i data-lucide="mail" class="h-[18px] w-[18px] shrink-0 text-muted" aria-hidden="true"></i>
+							<input id="email" name="email" type="email" autocomplete="email" placeholder="ban@example.com" required class="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-600" />
+						</div>
+						<p id="email-error" class="mt-2 hidden text-xs font-medium text-red-400" role="alert"></p>
+					</div>
+
+					<div>
+						<div class="mb-2 flex items-center justify-between gap-4">
+							<label for="password" class="block text-sm font-medium text-slate-200">Mật khẩu</label>
+							<a href="#forgot-password" class="text-xs font-medium text-primary transition-colors hover:text-orange-300 focus:outline-none focus:ring-2 focus:ring-primary/50">Quên mật khẩu?</a>
+						</div>
+						<div id="password-field" class="field flex h-12 items-center gap-3 rounded-lg border border-line bg-ink px-4 transition-colors">
+							<i data-lucide="lock-keyhole" class="h-[18px] w-[18px] shrink-0 text-muted" aria-hidden="true"></i>
+							<input id="password" name="password" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu của bạn" required class="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-600" />
+							<button type="button" aria-label="Hiển thị mật khẩu" class="text-muted transition-colors hover:text-white focus:outline-none focus:ring-2 focus:ring-primary/50" onclick="togglePassword()">
+								<i id="password-icon" data-lucide="eye" class="h-[18px] w-[18px]"></i>
+							</button>
+						</div>
+						<p id="password-error" class="mt-2 hidden text-xs font-medium text-red-400" role="alert"></p>
+					</div>
+
+					<div class="flex items-center gap-3 pt-1">
+						<input id="remember" name="remember" type="checkbox" class="h-4 w-4 cursor-pointer rounded border-line bg-ink text-primary accent-primary focus:ring-2 focus:ring-primary/50" />
+						<label for="remember" class="cursor-pointer text-sm text-muted">Ghi nhớ đăng nhập</label>
+					</div>
+
+					<button type="submit" class="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-lg shadow-orange-950/25 transition-all hover:bg-orange-500 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-panel active:scale-[0.99]">
+						Đăng nhập
+						<i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>
+					</button>
+				</form>
+
+				<div class="my-7 flex items-center gap-4">
+					<div class="h-px flex-1 bg-line"></div>
+					<span class="text-xs text-muted">HOẶC TIẾP TỤC VỚI</span>
+					<div class="h-px flex-1 bg-line"></div>
+				</div>
+
+				<div class="grid grid-cols-3 gap-3">
+					<button type="button" aria-label="Đăng nhập bằng Google" class="provider-button flex h-11 items-center justify-center rounded-lg border border-line bg-ink transition-colors hover:border-slate-500 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50">
+						<svg class="provider-icon h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+							<path fill="#EA4335" d="M21.6 12.23c0-.79-.07-1.55-.2-2.27H12v4.3h5.38a4.6 4.6 0 0 1-1.99 3.02v2.51h3.22c1.89-1.74 2.99-4.31 2.99-7.56Z" />
+							<path fill="#4285F4" d="M12 22c2.7 0 4.97-.9 6.62-2.45l-3.22-2.51c-.9.6-2.05.96-3.4.96-2.61 0-4.82-1.76-5.61-4.13H3.06v2.59A10 10 0 0 0 12 22Z" />
+							<path fill="#FBBC05" d="M6.39 13.87A6 6 0 0 1 6.08 12c0-.65.11-1.28.31-1.87V7.54H3.06A10 10 0 0 0 2 12c0 1.61.39 3.13 1.06 4.46l3.33-2.59Z" />
+							<path fill="#34A853" d="M12 6c1.47 0 2.79.5 3.83 1.48l2.87-2.87C16.96 2.92 14.7 2 12 2a10 10 0 0 0-8.94 5.54l3.33 2.59C7.18 7.76 9.39 6 12 6Z" />
+						</svg>
+					</button>
+					<button type="button" aria-label="Đăng nhập bằng GitHub" class="provider-button flex h-11 items-center justify-center rounded-lg border border-line bg-ink transition-colors hover:border-slate-500 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50">
+						<svg class="provider-icon h-5 w-5 text-slate-200" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+							<path d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.71.5.1.68-.22.68-.49v-1.7c-2.78.62-3.37-1.22-3.37-1.22-.46-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.89 1.57 2.34 1.12 2.91.86.09-.67.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.2 9.2 0 0 1 12 7.14c.85 0 1.71.12 2.51.36 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.8-4.57 5.06.36.32.68.95.68 1.92v2.84c0 .27.18.59.69.49A10.24 10.24 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z" />
+						</svg>
+					</button>
+					<button type="button" aria-label="Đăng nhập bằng Facebook" class="provider-button flex h-11 items-center justify-center rounded-lg border border-line bg-ink transition-colors hover:border-slate-500 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50">
+						<svg class="provider-icon h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+							<circle cx="12" cy="12" r="10" fill="#1877F2" />
+							<path fill="#fff" d="M13.36 19v-6.12h2.05l.31-2.39h-2.36V8.97c0-.69.19-1.16 1.18-1.16h1.26V5.67c-.22-.03-.98-.1-1.86-.1-1.84 0-3.1 1.12-3.1 3.18v1.74H8.76v2.39h2.08V19h2.52Z" />
+						</svg>
+					</button>
+				</div>
+
+				<p class="mt-8 text-center text-sm text-muted">Chưa có tài khoản? <a href="@register.html" class="font-semibold text-primary transition-colors hover:text-orange-300">Vui lòng đăng ký</a></p>
+			</div>
+
+			<p class="mt-6 text-center text-xs text-slate-600">Bằng việc tiếp tục, bạn đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.</p>
+		</section>
+	</main>
+
+	<script>
+		lucide.createIcons();
+
+			const loginForm = document.getElementById('login-form');
+			const emailInput = document.getElementById('email');
+			const passwordInput = document.getElementById('password');
+
+			function validateEmail() {
+				const emailError = document.getElementById('email-error');
+				const emailField = document.getElementById('email-field');
+				const email = emailInput.value.trim();
+				let message = '';
+
+				if (!email) {
+					message = 'Email là bắt buộc.';
+				} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+					message = 'Vui lòng nhập địa chỉ email hợp lệ.';
+				}
+
+				emailError.textContent = message;
+				emailError.classList.toggle('hidden', !message);
+				emailField.classList.toggle('border-red-400', Boolean(message));
+				emailInput.setAttribute('aria-invalid', String(Boolean(message)));
+				return !message;
+			}
+
+			function validatePassword() {
+				const passwordError = document.getElementById('password-error');
+				const passwordField = document.getElementById('password-field');
+				const message = passwordInput.value ? '' : 'Mật khẩu là bắt buộc.';
+
+				passwordError.textContent = message;
+				passwordError.classList.toggle('hidden', !message);
+				passwordField.classList.toggle('border-red-400', Boolean(message));
+				passwordInput.setAttribute('aria-invalid', String(Boolean(message)));
+				return !message;
+			}
+
+			loginForm.addEventListener('submit', (event) => {
+				const isEmailValid = validateEmail();
+				const isPasswordValid = validatePassword();
+
+				if (!isEmailValid || !isPasswordValid) {
+					event.preventDefault();
+					(!isEmailValid ? emailInput : passwordInput).focus();
+				}
+			});
+
+			emailInput.addEventListener('blur', validateEmail);
+			emailInput.addEventListener('input', () => {
+				if (emailInput.value) validateEmail();
+			});
+			passwordInput.addEventListener('blur', validatePassword);
+			passwordInput.addEventListener('input', () => {
+				if (passwordInput.value) validatePassword();
+			});
+
+		function togglePassword() {
+			const input = document.getElementById('password');
+			const button = document.querySelector('[aria-label="Hiển thị mật khẩu"], [aria-label="Ẩn mật khẩu"]');
+			const icon = document.getElementById('password-icon');
+			const isPassword = input.type === 'password';
+			input.type = isPassword ? 'text' : 'password';
+			button.setAttribute('aria-label', isPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu');
+			icon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
+			icon.outerHTML = '<i id="password-icon" data-lucide="' + (isPassword ? 'eye-off' : 'eye') + '" class="h-[18px] w-[18px]"></i>';
+			lucide.createIcons();
+		}
+	</script>
+</body>
+</html>
