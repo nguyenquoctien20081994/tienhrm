@@ -61,6 +61,17 @@ Kết luận "tản nhiệt tốt/kém" chỉ đưa ra khi có số liệu tải
 - Nút **HUD / COCKPIT**: HUD là đồng hồ cơ tròn; COCKPIT là thanh đo dọc kiểu buồng lái máy bay, có con trỏ, dải vùng nhiệt và số đọc lớn.
 - Nút **◐ AUTO / ☾ ĐÊM / ☀ NGÀY**: AUTO tự đổi theo giờ (6:00–18:00 là ngày). Mặt đồng hồ luôn giữ nền tối như đồng hồ thật.
 
+### Giao diện Việt Tâm (có nhân vật)
+- Nút **VIỆT TÂM** trên thanh điều khiển chuyển sang giao diện của Công ty TNHH Thiết Bị Việt Tâm (bấm **THERMAL** để về giao diện gốc):
+  tông cam – xanh đen, tiêu đề "VIỆT TÂM", và 2 nhân vật nam/nữ nói tình trạng máy bằng lời dễ hiểu.
+- Biểu cảm nhân vật đổi theo mức nhiệt: mát → cười, ấm → bình thường, nóng → lo lắng + đổ mồ hôi, quá nhiệt → hốt hoảng, rung.
+  Khi có lời khuyên cụ thể (vd. ổ cứng cần sao lưu), nhân vật nữ nói lời khuyên đó.
+- Màu riêng của 3 đồng hồ (CPU xanh, GPU hồng, MAINBOARD lục) giữ nguyên ở cả 2 giao diện.
+- **Dùng nhân vật / logo thật**: mở **CALIBRATE** → mục *Ảnh cho giao diện Việt Tâm* → **CHỌN ẢNH** cho *Nhân vật nam*, *Nhân vật nữ*, *Logo công ty*.
+  Nên dùng PNG nền trong suốt, nhân vật đứng thẳng. Ảnh được thu nhỏ còn tối đa 640 px và lưu trong thư mục dữ liệu của app
+  (`%LOCALAPPDATA%\ThermalCoreHUD\brand\`), không gửi ra ngoài. Chỉ nhận PNG/JPG/GIF/WebP (không nhận SVG vì lý do bảo mật).
+  Bấm **XOÁ** để quay về hình vẽ minh hoạ có sẵn.
+
 ### CORE MAP – bản đồ nhiệt từng nhân CPU
 Mỗi hàng là một nhân, mỗi cột là một lần đo trong 60 phút gần nhất; màu càng đậm/càng cam là càng nóng (thang cố định 30–100°C). Cột bên phải ghi nhiệt độ và tải hiện tại của từng nhân. Rê chuột để xem chi tiết. Nhân nào nóng hơn hẳn các nhân khác có thể do lỗi keo tản nhiệt.
 
@@ -205,7 +216,24 @@ LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
 - **Tự động**: mỗi lần push thay đổi trong `thermal-monitor/`, GitHub Actions (`.github/workflows/thermal-core-hud.yml`) build trên Windows, chạy unit test, chạy thử exe (chế độ demo và chế độ thật có tự tải LHM), rồi đăng `ThermalCoreHUD.exe` cùng mã SHA256 lên trang Releases.
 - **Thủ công** trên máy Windows có Python: chạy `build-exe.bat` → `dist\ThermalCoreHUD.exe`.
 
-## 8. Kiểm thử
+## 8. Tác giả và giấy phép bên thứ ba
+
+**Thermal Core HUD** – thiết kế & phát triển: **Nguyễn Quốc Tiến** (`nguyenquoctien`). Chữ ký tác giả có ở chân trang,
+chìm trong nền giao diện, trong thông tin file (`ThermalCoreHUD.exe` → Properties → Details) và trong `/api/info`.
+
+Toàn bộ mã nguồn trong thư mục `thermal-monitor/` được viết riêng cho dự án này. App dùng các thành phần mã nguồn mở / miễn phí sau
+(không sửa đổi mã của chúng):
+
+| Thành phần | Dùng để | Giấy phép | Cách đi kèm |
+|---|---|---|---|
+| [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) v0.9.6 | Đọc cảm biến trên Windows | MPL-2.0 | Không đóng gói; app tự tải bản chính thức từ GitHub (kiểm tra SHA256) ở lần chạy đầu |
+| PawnIO | Driver cho LHM đọc cảm biến | của tác giả PawnIO | Do LibreHardwareMonitor đề nghị cài; app không đóng gói |
+| HWiNFO (tuỳ chọn, nguồn B) | Nhiệt độ mainboard | Freeware (không mã nguồn mở) | Người dùng tự cài; app chỉ đọc bộ nhớ chia sẻ |
+| Python, Tcl/Tk | Ngôn ngữ chạy app, cửa sổ overlay | PSF License, BSD-style | Đóng gói trong exe |
+| Pillow | Vẽ overlay | MIT-CMU | Đóng gói trong exe |
+| PyInstaller | Đóng gói exe | GPL-2.0 kèm ngoại lệ bootloader (cho phép phát hành exe theo giấy phép tuỳ ý) | Chỉ dùng lúc build |
+
+## 9. Kiểm thử
 
 ```
 python -m unittest discover -s tests -v

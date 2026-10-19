@@ -27,7 +27,7 @@
     interval: 6,
     historyDays: 30,
     boardSource: "auto",
-    ui: store.get("ui", { style: "hud", theme: "auto" }),
+    ui: { style: "hud", theme: "auto", brand: "thermal", ...store.get("ui", {}) },
     sound: false,
     thresholds: store.get("thresholds", {}),
     picks: store.get("picks", {}),
@@ -56,9 +56,9 @@
       settings.historyDays = s.history_days || 30;
       settings.boardSource = s.board_source || "auto";
       updateSourceSwitch();
-      settings.ui = { style: "hud", theme: "auto", ...(s.ui || {}) };
+      settings.ui = { style: "hud", theme: "auto", brand: "thermal", ...(s.ui || {}) };
       store.set("ui", settings.ui);
-      applyTheme(); updateStyleButton();
+      applyTheme(); updateStyleButton(); applyBrand();
       settings.picks = s.picks || {};
       settings.thresholds = s.thresholds || {};
       for (const g of GAUGES) {
@@ -672,6 +672,7 @@
     }
     updateHeader(snap);
     renderVerdict(snap.assessment);
+    renderCrew(snap.assessment);
     if (snap.version) $("#footVersion").textContent = `THERMAL CORE HUD v${snap.version}`;
     renderTele(snap);
     updateSourceSwitch(snap.metrics?.board_source);
@@ -756,6 +757,86 @@
     const ring = $("#vRing"), len = 2 * Math.PI * 19;
     ring.style.strokeDasharray = `${len}`;
     ring.style.strokeDashoffset = `${len * (1 - (a.score ?? 0) / 100)}`;
+  }
+
+  // ---- giao diện Việt Tâm: 2 nhân vật nói tình trạng máy bằng lời dễ hiểu
+  const CREW_LINES = {
+    cool: ["Máy đang mát rượi, cứ yên tâm làm việc nhé!", "Tản nhiệt hoạt động rất tốt – máy khoẻ re!"],
+    normal: ["Nhiệt độ ổn định, mọi thứ đang bình thường.", "Nhớ để máy ở chỗ thoáng gió để luôn mát như vầy nha!"],
+    warm: ["Máy hơi ấm lên rồi, nhưng vẫn trong ngưỡng an toàn.", "Tắt bớt ứng dụng, tab không dùng cho máy nhẹ hơn nhé."],
+    hot: ["Máy đang nóng! Mình giảm tải một chút nhé.", "Kiểm tra khe gió, quạt xem có bụi hoặc bị che không nha!"],
+    critical: ["Quá nhiệt! Lưu công việc và đóng ứng dụng nặng ngay!", "Nếu bị lặp lại, báo IT/HCNS kiểm tra máy giúp mình nhé."],
+    unknown: ["Đang đọc cảm biến…", "Chờ mình một chút nha!"],
+  };
+  function renderCrew(a) {
+    const crew = $("#crew");
+    if (crew.hidden) return;
+    const level = a?.level || "unknown";
+    crew.dataset.level = level;
+    crew.style.setProperty("--lv", LEVEL_COLOR[level] || LEVEL_COLOR.unknown);
+    const [nam, nu] = CREW_LINES[level] || CREW_LINES.unknown;
+    $("#sayNam").textContent = nam;
+    // Có lời khuyên cụ thể (vd. ổ cứng sắp hỏng) thì nhân vật nữ nhắc lời khuyên đó
+    $("#sayNu").textContent = (a?.tips && a.tips[0]) || nu;
+  }
+  function applyBrand() {
+    const vt = settings.ui.brand === "viettam";
+    document.documentElement.dataset.brand = vt ? "viettam" : "thermal";
+    document.title = vt ? "Việt Tâm · Giám sát nhiệt độ" : "Thermal Core HUD";
+    $("#btnBrand").textContent = vt ? "THERMAL" : "VIỆT TÂM";
+    $("#btnBrand").title = vt ? "Về giao diện Thermal Core gốc" : "Đổi sang giao diện Việt Tâm (có nhân vật)";
+    $("#crew").hidden = !vt;
+    if (vt) { loadBrandImages(); renderCrew(state.snap?.assessment); }
+  }
+  // Ảnh nhân vật / logo do người dùng tải lên (lưu trong thư mục dữ liệu của app)
+  let brandStamp = Date.now();
+  async function loadBrandImages() {
+    let have = {};
+    if (hasBackend && !state.demo) {
+      try { const r = await fetch("api/brand", { cache: "no-store" }); if (r.ok) have = await r.json(); } catch { /* app đã tắt */ }
+    }
+    const setImg = (img, slot) => {
+      if (have[slot]) { img.src = `api/brand/${slot}?v=${brandStamp}`; img.hidden = false; } else { img.removeAttribute("src"); img.hidden = true; }
+    };
+    for (const mate of document.querySelectorAll("#crew .mate")) {
+      const img = $("img", mate);
+      setImg(img, mate.dataset.slot);
+      $(".fig", mate).classList.toggle("has-img", !img.hidden);
+    }
+    setImg($("#vtLogo"), "logo");
+    for (const row of document.querySelectorAll(".brand-slot")) {
+      const slot = row.dataset.slot;
+      $(".thumb", row).style.backgroundImage = have[slot] ? `url("api/brand/${slot}?v=${brandStamp}")` : "";
+      $(".del", row).disabled = !have[slot];
+    }
+  }
+  // Thu nhỏ ảnh trước khi gửi (tối đa 640 px) để file gọn; xuất PNG để giữ nền trong suốt
+  async function shrinkImage(file) {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 640 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return new Promise((ok) => c.toBlob(ok, "image/png"));
+  }
+  for (const row of document.querySelectorAll(".brand-slot")) {
+    const slot = row.dataset.slot, note = $("#brandNote");
+    const send = async (method, body) => {
+      if (!hasBackend || state.demo) { note.textContent = "Chế độ DEMO trong trình duyệt không lưu được ảnh – hãy chạy app."; return; }
+      const r = await fetch(`api/brand/${slot}`, { method, headers: { "X-TCH": "1", "Content-Type": "image/png" }, body });
+      const res = await r.json().catch(() => ({}));
+      if (!r.ok) { note.textContent = `Không lưu được ảnh: ${res.error || r.status}`; return; }
+      note.textContent = method === "DELETE" ? "Đã xoá ảnh – dùng lại hình minh hoạ." : "Đã lưu ảnh.";
+      brandStamp = Date.now();
+      loadBrandImages();
+    };
+    $("input", row).addEventListener("change", async (e) => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      try { await send("POST", await shrinkImage(f)); } catch { note.textContent = "Không đọc được file ảnh này."; }
+    });
+    $(".del", row).addEventListener("click", () => send("DELETE"));
   }
 
   // ---- thông số phụ dưới mỗi đồng hồ: tải, công suất, xung, khoảng cách tới TjMax, quạt...
@@ -929,6 +1010,11 @@
     store.set("ui", settings.ui); saveServer({ ui: settings.ui });
     updateStyleButton(); rebuildAll();
   };
+  $("#btnBrand").onclick = () => {
+    settings.ui = { ...settings.ui, brand: settings.ui.brand === "viettam" ? "thermal" : "viettam" };
+    store.set("ui", settings.ui); saveServer({ ui: settings.ui });
+    applyBrand();
+  };
   $("#btnTheme").onclick = () => {
     const order = ["auto", "night", "day"];
     settings.ui = { ...settings.ui, theme: order[(order.indexOf(settings.ui.theme) + 1) % order.length] };
@@ -936,7 +1022,8 @@
     applyTheme();
   };
   setInterval(applyTheme, 60000);  // chế độ tự động đổi theo giờ (6:00–18:00 là ngày)
-  applyTheme(); updateStyleButton();
+  applyTheme(); updateStyleButton(); applyBrand();
+  console.info("%cThermal Core HUD – thiết kế & phát triển: Nguyễn Quốc Tiến (nguyenquoctien)", "color:#df6b33;font-weight:bold");
 
   const btnUnit = $("#btnUnit");
   btnUnit.textContent = "°" + settings.unit;

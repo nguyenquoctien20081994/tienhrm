@@ -29,7 +29,8 @@ import history
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.5.1"
+APP_VERSION = "1.6.0"
+APP_AUTHOR = "Nguyễn Quốc Tiến"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
 FROZEN = getattr(sys, "frozen", False)
@@ -54,13 +55,20 @@ HISTORY_DAY_CHOICES = (7, 14, 30)
 UI_STYLES = ("hud", "cockpit")
 BOARD_SOURCES = ("auto", "hwinfo")  # A: LHM (thiếu thì dùng ổ SSD) / B: HWiNFO
 UI_THEMES = ("auto", "night", "day")
+UI_BRANDS = ("thermal", "viettam")  # giao diện gốc / giao diện Công ty TNHH Thiết Bị Việt Tâm
+BRAND_SLOTS = ("nam", "nu", "logo")  # ảnh nhân vật nam, nữ và logo cho giao diện Việt Tâm
+BRAND_MAX_BYTES = 3 * 1024 * 1024
+# Chỉ nhận ảnh bitmap; không nhận SVG vì SVG có thể chứa script chạy trong trang
+_IMAGE_MAGIC = ((b"\x89PNG\r\n\x1a\n", "image/png"), (b"\xff\xd8\xff", "image/jpeg"), (b"GIF87a", "image/gif"),
+                (b"GIF89a", "image/gif"))
 DEFAULT_SETTINGS = {
     "unit": "C",
     "settings_version": SETTINGS_VERSION,
     "interval": 6,  # giây giữa 2 lần đọc cảm biến
     "history_days": 30,  # số ngày giữ nhật ký nhiệt độ
     "board_source": "auto",  # nguồn nhiệt độ mainboard: "auto" (A) hoặc "hwinfo" (B)
-    "ui": {"style": "hud", "theme": "auto"},  # đồng hồ cơ / buồng lái; ngày / đêm / tự động theo giờ
+    # đồng hồ cơ / buồng lái; ngày / đêm / tự động theo giờ; giao diện gốc / Việt Tâm
+    "ui": {"style": "hud", "theme": "auto", "brand": "thermal"},
     # Ngưỡng cho ThinkPad X1 Yoga Gen 5 (i7-10610U, TjMax 100 °C; iGPU chung đế với CPU)
     "thresholds": {"cpu": {"warn": 85, "crit": 95}, "gpu": {"warn": 85, "crit": 95},
                    "board": {"warn": 65, "crit": 80}},
@@ -77,6 +85,55 @@ def settings_path() -> str:
         base = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "thermalcorehud")
         os.makedirs(base, exist_ok=True)
     return os.path.join(base, "settings.json")
+
+
+def image_type(data: bytes) -> str | None:
+    """Loại ảnh theo vài byte đầu (không tin phần mở rộng hay Content-Type do trình duyệt gửi)."""
+    for magic, ctype in _IMAGE_MAGIC:
+        if data.startswith(magic):
+            return ctype
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+class BrandStore:
+    """Ảnh nhân vật / logo người dùng tải lên cho giao diện Việt Tâm, lưu cạnh settings.json."""
+
+    def __init__(self, folder: str):
+        self.folder = folder
+
+    def _path(self, slot: str) -> str:
+        return os.path.join(self.folder, slot + ".img")
+
+    def available(self) -> dict:
+        return {slot: os.path.isfile(self._path(slot)) for slot in BRAND_SLOTS}
+
+    def load(self, slot: str) -> tuple[bytes, str] | None:
+        try:
+            with open(self._path(slot), "rb") as f:
+                data = f.read(BRAND_MAX_BYTES + 1)
+        except OSError:
+            return None
+        ctype = image_type(data)
+        return (data, ctype) if ctype else None
+
+    def save(self, slot: str, data: bytes) -> None:
+        if len(data) > BRAND_MAX_BYTES:
+            raise ValueError("Ảnh quá lớn (tối đa 3 MB).")
+        if image_type(data) is None:
+            raise ValueError("Chỉ nhận ảnh PNG, JPG, GIF hoặc WebP.")
+        os.makedirs(self.folder, exist_ok=True)
+        tmp = self._path(slot) + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, self._path(slot))
+
+    def delete(self, slot: str) -> None:
+        try:
+            os.remove(self._path(slot))
+        except FileNotFoundError:
+            pass
 
 
 def _deep_merge(dst: dict, src: dict) -> dict:
@@ -111,9 +168,10 @@ def validate_settings_patch(patch) -> dict:
         out["history_days"] = patch["history_days"]
     if "ui" in patch:
         ui = patch["ui"]
-        if not isinstance(ui, dict) or ui.get("style", "hud") not in UI_STYLES or ui.get("theme", "auto") not in UI_THEMES:
-            raise ValueError(f"ui.style phải thuộc {UI_STYLES}, ui.theme thuộc {UI_THEMES}")
-        out["ui"] = {k: ui[k] for k in ("style", "theme") if k in ui}
+        if not isinstance(ui, dict) or ui.get("style", "hud") not in UI_STYLES or ui.get("theme", "auto") not in UI_THEMES \
+                or ui.get("brand", "thermal") not in UI_BRANDS:
+            raise ValueError(f"ui.style phải thuộc {UI_STYLES}, ui.theme thuộc {UI_THEMES}, ui.brand thuộc {UI_BRANDS}")
+        out["ui"] = {k: ui[k] for k in ("style", "theme", "brand") if k in ui}
     if "thresholds" in patch:
         th = patch["thresholds"]
         if not isinstance(th, dict):
@@ -308,7 +366,8 @@ class Sampler:
                 self.idle_since = time.monotonic()
 
 
-def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_ctl=None, db=None, diag_fn=None):
+def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_ctl=None, db=None, diag_fn=None,
+                 brand: BrandStore | None = None):
     class Handler(BaseHTTPRequestHandler):
         server_version = f"{APP_NAME}/{APP_VERSION}"
 
@@ -320,14 +379,14 @@ def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_c
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(body)
 
         def do_GET(self):  # noqa: N802
             path = urlparse(self.path).path
             if path == "/api/info":
-                return self._send(200, json.dumps({"app": APP_NAME, "version": APP_VERSION}).encode(),
-                                  "application/json")
+                return self._json(200, {"app": APP_NAME, "version": APP_VERSION, "author": APP_AUTHOR})
             if path == "/api/snapshot":
                 _, snap = sampler.wait_next(-1, 0)
                 return self._send(200, json.dumps(snap or {}).encode(), "application/json")
@@ -335,6 +394,11 @@ def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_c
                 return self._stream()
             if path == "/api/settings":
                 return self._json(200, store.get())
+            if path == "/api/brand":
+                return self._json(200, brand.available() if brand else {})
+            if path.startswith("/api/brand/"):
+                got = brand.load(path.rsplit("/", 1)[1]) if brand and path.rsplit("/", 1)[1] in BRAND_SLOTS else None
+                return self._send(200, *got) if got else self._send(404, b"Not found", "text/plain; charset=utf-8")
             if path == "/api/diagnostics":
                 body = json.dumps(diag_fn() if diag_fn else {}, ensure_ascii=False, indent=1, default=str).encode()
                 name = time.strftime("thermalcore-chan-doan-%Y%m%d-%H%M.json")
@@ -364,6 +428,8 @@ def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_c
             # Header tuỳ biến buộc trình duyệt kiểm tra CORS -> trang web lạ không gọi được API này
             if self.headers.get("X-TCH") != "1":
                 return self._json(403, {"error": "forbidden"})
+            if urlparse(self.path).path.startswith("/api/brand/"):
+                return self._brand_write(delete=False)
             try:
                 length = int(self.headers.get("Content-Length") or 0)
                 if length > 65536:
@@ -387,6 +453,28 @@ def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_c
                 overlay_ctl.request(action)
                 return self._json(200, {"ok": True})
             return self._json(404, {"error": "not found"})
+
+        def do_DELETE(self):  # noqa: N802
+            if self.headers.get("X-TCH") != "1":
+                return self._json(403, {"error": "forbidden"})
+            return self._brand_write(delete=True)
+
+        def _brand_write(self, delete: bool) -> None:
+            """Tải lên (POST, thân là file ảnh) hoặc xoá (DELETE) ảnh nhân vật / logo."""
+            slot = urlparse(self.path).path.rsplit("/", 1)[1]
+            if brand is None or slot not in BRAND_SLOTS or not urlparse(self.path).path.startswith("/api/brand/"):
+                return self._json(404, {"error": "not found"})
+            try:
+                if delete:
+                    brand.delete(slot)
+                else:
+                    length = int(self.headers.get("Content-Length") or 0)
+                    if not 0 < length <= BRAND_MAX_BYTES:
+                        raise ValueError("Ảnh quá lớn (tối đa 3 MB) hoặc rỗng.")
+                    brand.save(slot, self.rfile.read(length))
+            except (ValueError, OSError) as exc:
+                return self._json(400, {"error": str(exc)})
+            return self._json(200, brand.available())
 
         def _stream(self) -> None:
             self.send_response(200)
@@ -598,13 +686,16 @@ def main() -> None:
 
     # Chỉ lắng nghe 127.0.0.1: máy khác trong mạng không truy cập được.
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(sampler, resource_dir(), store, ctl, db, diag_fn))
+        brand = BrandStore(os.path.join(os.path.dirname(settings_path()), "brand"))
+        server = ThreadingHTTPServer(("127.0.0.1", args.port),
+                                     make_handler(sampler, resource_dir(), store, ctl, db, diag_fn, brand))
     except OSError as exc:
         fatal(f"Không mở được cổng {args.port} ({exc}). Hãy đóng ứng dụng đang dùng cổng này "
               f"hoặc chạy với tham số --port khác.")
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    print(f"{APP_NAME} {APP_VERSION} đang chạy tại {url}  (Ctrl+C để thoát)")
+    print(f"{APP_NAME} {APP_VERSION} – thiết kế & phát triển: {APP_AUTHOR}")
+    print(f"Đang chạy tại {url}  (Ctrl+C để thoát)")
     first = sampler.wait_next(0, timeout=10)[1] or {}
     print(f"Nguồn dữ liệu: {first.get('source', '—')} | {len(first.get('sensors', []))} cảm biến nhiệt độ")
     for msg in first.get("messages", []):
