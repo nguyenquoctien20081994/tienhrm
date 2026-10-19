@@ -1,4 +1,4 @@
-"""Nguồn đọc nhiệt độ phần cứng cho Thermal Core HUD.
+"""Nguồn đọc nhiệt độ phần cứng cho VietTam Core Hub.
 
 Mỗi provider trả về danh sách Sensor. Thứ tự ưu tiên khi chạy chế độ "auto":
 

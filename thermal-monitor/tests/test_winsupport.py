@@ -74,3 +74,39 @@ class LhmConfig(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LegacyDataDir(unittest.TestCase):
+    """Đổi tên app (Thermal Core HUD -> VietTam Core Hub): dữ liệu cũ phải theo sang thư mục mới."""
+
+    def test_moves_old_folder_once(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            old, new = os.path.join(d, "ThermalCoreHUD"), os.path.join(d, "viettam-core-hub")
+            os.makedirs(os.path.join(old, "brand"))
+            with open(os.path.join(old, "settings.json"), "w", encoding="utf-8") as f:
+                f.write('{"interval": 1}')
+            winsupport.adopt_legacy_dir(new, [old])
+            self.assertFalse(os.path.exists(old))
+            with open(os.path.join(new, "settings.json"), encoding="utf-8") as f:
+                self.assertEqual(f.read(), '{"interval": 1}')
+            self.assertTrue(os.path.isdir(os.path.join(new, "brand")))
+            # Đã có thư mục mới -> không đụng tới thư mục cũ (nếu có) nữa
+            os.makedirs(old)
+            winsupport.adopt_legacy_dir(new, [old])
+            self.assertTrue(os.path.isdir(old))
+
+    def test_copies_when_rename_fails(self):
+        import tempfile
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as d:
+            old, new = os.path.join(d, "ThermalCoreHUD"), os.path.join(d, "viettam-core-hub")
+            os.makedirs(old)
+            for name in ("settings.json", "history.db", "old.log"):
+                with open(os.path.join(old, name), "w", encoding="utf-8") as f:
+                    f.write("x")
+            with mock.patch("os.rename", side_effect=PermissionError("đang bị bản cũ giữ")):
+                winsupport.adopt_legacy_dir(new, [old])
+            self.assertEqual(sorted(os.listdir(new)), ["history.db", "settings.json"])

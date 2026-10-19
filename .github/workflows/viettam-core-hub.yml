@@ -1,10 +1,10 @@
-name: Thermal Core HUD (Windows .exe)
+name: VietTam Core Hub (Windows .exe)
 
 on:
   push:
     paths:
       - "thermal-monitor/**"
-      - ".github/workflows/thermal-core-hud.yml"
+      - ".github/workflows/viettam-core-hub.yml"
   workflow_dispatch:
 
 permissions:
@@ -50,15 +50,15 @@ jobs:
           Write-Host "Bootloader: $boot"
           (Get-Item $boot).LastWriteTime
 
-      - name: Build ThermalCoreHUD.exe
+      - name: Build viettam-core-hub.exe
         run: >
           python -m PyInstaller --noconfirm --clean --onefile --windowed --uac-admin
-          --name ThermalCoreHUD --icon assets/icon.ico --version-file version_info.txt
+          --name viettam-core-hub --icon assets/icon.ico --version-file version_info.txt
           --add-data "web;web" app.py
 
       - name: Smoke test - demo mode
         run: |
-          $p = Start-Process dist/ThermalCoreHUD.exe -ArgumentList '--demo','--ui','none','--port','8790' -PassThru
+          $p = Start-Process dist/viettam-core-hub.exe -ArgumentList '--demo','--ui','none','--port','8790' -PassThru
           $ok = $false
           for ($i = 0; $i -lt 30 -and -not $ok; $i++) {
             Start-Sleep 1
@@ -66,12 +66,12 @@ jobs:
           }
           $html = (Invoke-WebRequest http://127.0.0.1:8790/ -UseBasicParsing).Content
           taskkill /PID $p.Id /T /F | Out-Null   # exe một file = 2 tiến trình (bootloader + app)
-          if (-not $ok -or $html -notmatch 'THERMAL') { throw 'Demo smoke test failed' }
+          if (-not $ok -or $html -notmatch 'VietTam Core Hub') { throw 'Demo smoke test failed' }
           Write-Host "Demo OK: $($s.sensors.Count) sensors, version $($s.version)"
 
       - name: Smoke test - overlay window (screenshot)
         run: |
-          $p = Start-Process dist/ThermalCoreHUD.exe -ArgumentList '--demo','--overlay','--port','8792' -PassThru
+          $p = Start-Process dist/viettam-core-hub.exe -ArgumentList '--demo','--overlay','--port','8792' -PassThru
           $ok = $false
           for ($i = 0; $i -lt 30 -and -not $ok; $i++) {
             Start-Sleep 1
@@ -104,8 +104,8 @@ jobs:
 
       - name: Smoke test - real mode (auto-download LibreHardwareMonitor)
         run: |
-          $p = Start-Process dist/ThermalCoreHUD.exe -ArgumentList '--ui','none','--port','8791' -PassThru
-          $lhm = Join-Path $env:LOCALAPPDATA 'ThermalCoreHUD/lhm'
+          $p = Start-Process dist/viettam-core-hub.exe -ArgumentList '--ui','none','--port','8791' -PassThru
+          $lhm = Join-Path $env:LOCALAPPDATA 'viettam-core-hub/lhm'
           $ok = $false
           for ($i = 0; $i -lt 90 -and -not $ok; $i++) {
             Start-Sleep 1
@@ -128,36 +128,36 @@ jobs:
       - name: Checksum
         id: meta
         run: |
-          $hash = (Get-FileHash dist/ThermalCoreHUD.exe -Algorithm SHA256).Hash
+          $hash = (Get-FileHash dist/viettam-core-hub.exe -Algorithm SHA256).Hash
           $ver = (Select-String -Path app.py -Pattern 'APP_VERSION = "(.+?)"').Matches[0].Groups[1].Value
-          "$hash  ThermalCoreHUD.exe" | Out-File dist/ThermalCoreHUD.exe.sha256 -Encoding ascii
+          "$hash  viettam-core-hub.exe" | Out-File dist/viettam-core-hub.exe.sha256 -Encoding ascii
           "sha256=$hash" >> $env:GITHUB_OUTPUT
           "version=$ver" >> $env:GITHUB_OUTPUT
           Write-Host "v$ver SHA256 $hash"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ThermalCoreHUD-${{ steps.meta.outputs.version }}
+          name: viettam-core-hub-${{ steps.meta.outputs.version }}
           path: |
-            thermal-monitor/dist/ThermalCoreHUD.exe
-            thermal-monitor/dist/ThermalCoreHUD.exe.sha256
+            thermal-monitor/dist/viettam-core-hub.exe
+            thermal-monitor/dist/viettam-core-hub.exe.sha256
 
       - name: Publish GitHub release
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "thermal-core-hud-v${{ steps.meta.outputs.version }}-b${{ github.run_number }}"
+          $tag = "viettam-core-hub-v${{ steps.meta.outputs.version }}-b${{ github.run_number }}"
           $notes = @"
-          Thermal Core HUD v${{ steps.meta.outputs.version }} (build ${{ github.run_number }}, commit ${{ github.sha }})
+          VietTam Core Hub v${{ steps.meta.outputs.version }} (build ${{ github.run_number }}, commit ${{ github.sha }})
 
-          Tải ThermalCoreHUD.exe, nhấp đúp, bấm Yes ở hộp thoại quyền Administrator.
+          Tải viettam-core-hub.exe, nhấp đúp, bấm Yes ở hộp thoại quyền Administrator.
           Lần đầu chạy app tự tải LibreHardwareMonitor v0.9.6 (có kiểm tra SHA256).
 
           SHA256: ${{ steps.meta.outputs.sha256 }}
           "@
-          $assets = @('dist/ThermalCoreHUD.exe', 'dist/ThermalCoreHUD.exe.sha256')
+          $assets = @('dist/viettam-core-hub.exe', 'dist/viettam-core-hub.exe.sha256')
           if (Test-Path dist/overlay-screenshot.png) { $assets += 'dist/overlay-screenshot.png#Overlay preview (build machine)' }
           gh release create $tag @assets `
-            --target "${{ github.sha }}" --title "Thermal Core HUD v${{ steps.meta.outputs.version }} (build ${{ github.run_number }})" `
+            --target "${{ github.sha }}" --title "VietTam Core Hub v${{ steps.meta.outputs.version }} (build ${{ github.run_number }})" `
             --notes $notes --latest

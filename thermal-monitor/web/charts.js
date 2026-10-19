@@ -1,4 +1,4 @@
-/* Thermal Core HUD – bảng phụ: bản đồ nhiệt từng nhân, sức khoẻ ổ cứng, nhật ký nhiệt độ.
+/* VietTam Core Hub – bảng phụ: bản đồ nhiệt từng nhân, sức khoẻ ổ cứng, nhật ký nhiệt độ.
    Nhận dữ liệu qua sự kiện "tch:snapshot" do app.js phát; màu lấy từ biến CSS nên tự đổi theo ngày/đêm. */
 (() => {
   "use strict";
@@ -186,7 +186,7 @@
     const days = REPORT_DAYS[range];
     const sum = $("#logSummary"), tiles = $("#logTiles");
     if (demo || !report) {
-      sum.innerHTML = `<li>${demo ? "Nhật ký cần chạy app (ThermalCoreHUD.exe hoặc python app.py)." : "Đang tải nhật ký…"}</li>`;
+      sum.innerHTML = `<li>${demo ? "Nhật ký cần chạy app (viettam-core-hub.exe hoặc python app.py)." : "Đang tải nhật ký…"}</li>`;
       tiles.innerHTML = ""; return;
     }
     if (!report.samples) {

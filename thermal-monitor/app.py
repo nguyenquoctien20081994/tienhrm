@@ -1,9 +1,9 @@
-"""Thermal Core HUD – app đo nhiệt độ CPU / GPU / Mainboard chạy local.
+"""VietTam Core Hub – app đo nhiệt độ CPU / GPU / Mainboard chạy local.
 
 Chạy:  python app.py            (tự mở giao diện)
        python app.py --demo     (dữ liệu mô phỏng để xem giao diện)
        python app.py --help
-Bản đóng gói: ThermalCoreHUD.exe (cùng tham số).
+Bản đóng gói: viettam-core-hub.exe (cùng tham số).
 """
 
 from __future__ import annotations
@@ -29,7 +29,9 @@ import assess
 import history
 import sensors
 
-APP_NAME = "ThermalCoreHUD"
+APP_NAME = "viettam-core-hub"
+APP_TITLE = "VietTam Core Hub"
+LEGACY_APP_NAMES = ("ThermalCoreHUD",)  # tên của bản ≤ 1.9.1
 APP_VERSION = "1.9.1"
 APP_AUTHOR = "Nguyễn Quốc Tiến"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
@@ -89,7 +91,11 @@ def settings_path() -> str:
     if IS_WINDOWS:
         base = winsupport.data_dir()
     else:
-        base = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "thermalcorehud")
+        from winsupport import adopt_legacy_dir  # hàm thuần os/shutil, dùng được trên Linux
+
+        root = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+        base = os.path.join(root, APP_NAME)
+        adopt_legacy_dir(base, [os.path.join(root, "thermalcorehud")])
         os.makedirs(base, exist_ok=True)
     return os.path.join(base, "settings.json")
 
@@ -409,7 +415,7 @@ def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_c
                 return self._send(200, *got) if got else self._send(404, b"Not found", "text/plain; charset=utf-8")
             if path == "/api/diagnostics":
                 body = json.dumps(diag_fn() if diag_fn else {}, ensure_ascii=False, indent=1, default=str).encode()
-                name = time.strftime("thermalcore-chan-doan-%Y%m%d-%H%M.json")
+                name = time.strftime(f"{APP_NAME}-chan-doan-%Y%m%d-%H%M.json")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Disposition", f'attachment; filename="{name}"')
@@ -568,19 +574,20 @@ def post_local(port: int, path: str, body: dict) -> bool:
         return False
 
 
-def existing_instance(port: int) -> bool:
+def running_app(port: int) -> str | None:
+    """Tên app đang chạy ở cổng này (bản này, bản cũ trước khi đổi tên, hoặc None)."""
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/info", timeout=1) as r:
-            return json.loads(r.read()).get("app") == APP_NAME
-    except (OSError, ValueError):
-        return False
+            return json.loads(r.read()).get("app")
+    except (OSError, ValueError, AttributeError):
+        return None
 
 
 def setup_logging() -> None:
-    """Bản .exe không có console -> ghi log ra %LOCALAPPDATA%\\ThermalCoreHUD\\thermal-core.log."""
+    """Bản .exe không có console -> ghi log ra %LOCALAPPDATA%\\viettam-core-hub\\viettam-core-hub.log."""
     if sys.stdout is not None and sys.stderr is not None:
         return
-    path = os.path.join(winsupport.data_dir() if winsupport else os.path.expanduser("~"), "thermal-core.log")
+    path = os.path.join(winsupport.data_dir() if winsupport else os.path.expanduser("~"), f"{APP_NAME}.log")
     log = open(path, "a", encoding="utf-8", buffering=1)  # noqa: SIM115 - mở suốt vòng đời app
     sys.stdout = sys.stderr = log
     print(f"\n=== {APP_NAME} {APP_VERSION} · {time.strftime('%Y-%m-%d %H:%M:%S')} ===")
@@ -594,10 +601,10 @@ def fatal(msg: str) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Thermal Core HUD – theo dõi nhiệt độ CPU/GPU/Mainboard realtime")
+    ap = argparse.ArgumentParser(description=f"{APP_TITLE} – theo dõi nhiệt độ CPU/GPU/Mainboard realtime")
     ap.add_argument("--port", type=int, default=8787, help="cổng giao diện (mặc định 8787)")
     ap.add_argument("--interval", type=float, default=None,
-                    help="chu kỳ đọc cảm biến, giây (mặc định theo cài đặt, 15 giây; chỉnh trong CALIBRATE)")
+                    help="chu kỳ đọc cảm biến, giây (mặc định theo cài đặt, 6 giây; chỉnh trong Cài đặt)")
     ap.add_argument("--demo", action="store_true", help="dùng dữ liệu mô phỏng")
     ap.add_argument("--lhm-url", default=None,
                     help=f"địa chỉ data.json của LibreHardwareMonitor (mặc định trên Windows: {DEFAULT_LHM_URL})")
@@ -610,12 +617,16 @@ def main() -> None:
                     help="chỉ hiện overlay 3 đồng hồ ở góc trên bên phải (không mở cửa sổ chính)")
     ap.add_argument("--keep-running", action="store_true",
                     help="không tự thoát khi đóng cửa sổ giao diện (mặc định bản .exe tự thoát)")
-    ap.add_argument("--version", action="version", version=f"{APP_NAME} {APP_VERSION}")
+    ap.add_argument("--version", action="version", version=f"{APP_TITLE} {APP_VERSION}")
     args = ap.parse_args()
 
-    setup_logging()
     url = f"http://127.0.0.1:{args.port}/"
-    if existing_instance(args.port):
+    running = running_app(args.port)
+    if running in LEGACY_APP_NAMES:  # kiểm tra trước khi chuyển thư mục dữ liệu cũ sang tên mới
+        fatal("Bản cũ Thermal Core HUD đang chạy. Hãy đóng cửa sổ giao diện và đồng hồ nổi của bản cũ "
+              f"(hoặc khởi động lại máy), rồi mở lại {APP_TITLE}.")
+    setup_logging()
+    if running == APP_NAME:
         print("App đã chạy sẵn -> chuyển yêu cầu cho bản đang chạy.")
         if args.overlay:
             post_local(args.port, "/api/overlay", {"action": "show"})
@@ -703,7 +714,7 @@ def main() -> None:
               f"hoặc chạy với tham số --port khác.")
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    print(f"{APP_NAME} {APP_VERSION} – thiết kế & phát triển: {APP_AUTHOR}")
+    print(f"{APP_TITLE} {APP_VERSION} – thiết kế & phát triển: {APP_AUTHOR}")
     print(f"Đang chạy tại {url}  (Ctrl+C để thoát)")
     first = sampler.wait_next(0, timeout=10)[1] or {}
     print(f"Nguồn dữ liệu: {first.get('source', '—')} | {len(first.get('sensors', []))} cảm biến nhiệt độ")

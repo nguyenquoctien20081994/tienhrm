@@ -1,4 +1,4 @@
-/* Thermal Core HUD – giao diện đồng hồ cơ / sci-fi, cập nhật realtime qua Server-Sent Events. */
+/* VietTam Core Hub – giao diện đồng hồ cơ / sci-fi, cập nhật realtime qua Server-Sent Events. */
 (() => {
   "use strict";
 
@@ -870,7 +870,7 @@
     renderVerdict(snap.assessment);
     renderVt(snap.assessment);
     if (isVt()) updateVtBar(snap);
-    if (snap.version) $("#footVersion").textContent = `THERMAL CORE HUD v${snap.version}`;
+    if (snap.version) $("#footVersion").textContent = `VIETTAM CORE HUB v${snap.version}`;
     renderTele(snap);
     updateSourceSwitch(snap.metrics?.board_source);
     renderBank(snap);
@@ -1009,7 +1009,7 @@
     const root = document.documentElement, was = root.dataset.brand;
     root.dataset.brand = vt ? "viettam" : "thermal";
     if (!root.dataset.tab) setTab(store.get("tab", "overview"));
-    document.title = vt ? "Việt Tâm · Giám sát nhiệt độ" : "Thermal Core HUD";
+    document.title = "VietTam Core Hub";
     $("#btnBrand").textContent = vt ? "THERMAL" : "VIỆT TÂM";
     $("#btnBrand").title = vt ? "Về giao diện Thermal Core gốc" : "Đổi sang giao diện Việt Tâm";
     $("#favicon").href = vt ? "img/vt/logo.png" : FAVICON_THERMAL;
@@ -1293,7 +1293,7 @@
   };
   setInterval(applyTheme, 60000);  // chế độ tự động đổi theo giờ (6:00–18:00 là ngày)
   applyTheme(); updateStyleButton(); applyBrand();
-  console.info("%cThermal Core HUD – thiết kế & phát triển: Nguyễn Quốc Tiến (nguyenquoctien)", "color:#1f6fe5;font-weight:bold");
+  console.info("%cVietTam Core Hub – thiết kế & phát triển: Nguyễn Quốc Tiến (nguyenquoctien)", "color:#1f6fe5;font-weight:bold");
 
   const btnUnit = $("#btnUnit");
   btnUnit.textContent = "°" + settings.unit;

@@ -1,4 +1,4 @@
-/* Thermal Core HUD – giao diện Việt Tâm: nổi khối 3D mềm, bóng sáng, tối giản.
+/* VietTam Core Hub – giao diện Việt Tâm: nổi khối 3D mềm, bóng sáng, tối giản.
    Thứ tự đọc: thẻ trạng thái ("máy có ổn không?") -> 3 đồng hồ -> tab Chi tiết / Nhật ký khi cần.
    Mọi luật gắn với :root[data-brand="viettam"]; giao diện Thermal Core gốc không bị ảnh hưởng. */
 
@@ -84,6 +84,7 @@
 .vt-mark { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .vt-mark img { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.18)); }
 .vt-mark b { display: block; font-family: var(--vt-head); font-weight: 700; font-size: 24px; line-height: 1; color: #1f8fd6; }
+.vt-mark b em { font-style: normal; font-weight: 500; color: var(--vt-ink); }
 .vt-mark small { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 12px; color: var(--vt-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vt-mark small i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--vt-muted); }
 .vt-mark small i[data-state="live"] { background: #22b36b; box-shadow: 0 0 0 3px rgba(34, 179, 107, 0.2); }
@@ -213,7 +214,8 @@
   :root[data-brand="viettam"] .vt-bar { grid-template-columns: 1fr auto; }
   .vt-tabs { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
   .vt-tabs button { padding: 8px 14px; font-size: 14px; }
-  .vt-mark small { max-width: 170px; }
+  .vt-mark b em { font-style: normal; font-weight: 500; color: var(--vt-ink); }
+.vt-mark small { max-width: 170px; }
   :root[data-brand="viettam"] .vt-hero { grid-template-columns: 92px minmax(0, 1fr); gap: 12px; padding: 0 14px 0 6px; margin-top: 40px; }
   .vt-person { height: 128px; margin-top: -36px; }
   .vt-score { display: none; }

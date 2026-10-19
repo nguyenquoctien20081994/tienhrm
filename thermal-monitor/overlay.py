@@ -499,7 +499,7 @@ def create_root():
         set_dpi_awareness()
         root = tk.Tk()
         root.withdraw()
-        root.title("Thermal Core HUD")
+        root.title("VietTam Core Hub")
         return root
     except Exception:  # noqa: BLE001 - thiếu Tk/Pillow hay không có màn hình -> tắt overlay
         return None

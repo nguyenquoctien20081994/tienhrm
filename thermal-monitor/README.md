@@ -1,4 +1,9 @@
-# Thermal Core HUD
+# VietTam Core Hub
+
+> Tên cũ: **Thermal Core HUD** (`ThermalCoreHUD.exe`, đến bản 1.9.1). Lần đầu chạy `viettam-core-hub.exe`, app tự chuyển thư mục
+> dữ liệu cũ `%LOCALAPPDATA%\ThermalCoreHUD` sang `%LOCALAPPDATA%\viettam-core-hub` – cài đặt, nhật ký nhiệt độ, ảnh nhân vật/logo
+> và LibreHardwareMonitor đã tải được giữ nguyên. Nếu bản cũ đang chạy, app sẽ nhắc đóng bản cũ trước. Giao diện sci-fi vẫn mang
+> tên "Thermal Core" (là tên kiểu giao diện, chọn trong Cài đặt).
 
 App chạy local trên máy tính, đo **nhiệt độ CPU, GPU, Mainboard, ổ cứng** (mặc định 6 giây/lần, chỉnh được 1 giây hoặc 5–60 giây), có **thanh nhận định bằng lời** cho người không chuyên, giao diện đồng hồ cơ kết hợp HUD gaming/viễn tưởng.
 
@@ -9,20 +14,20 @@ Bản này được chỉnh cho **ThinkPad X1 Yoga Gen 5 · Intel Core i7-10610U
 ## 1. Cài đặt và chạy (Windows)
 
 ### Cách 1 – File .exe (khuyên dùng, không cần Python)
-1. Vào trang **Releases** của repo, tải `ThermalCoreHUD.exe` ở bản mới nhất.
-2. Nhấp đúp `ThermalCoreHUD.exe` → bấm **Yes** ở hộp thoại quyền Administrator.
+1. Vào trang **Releases** của repo, tải `viettam-core-hub.exe` ở bản mới nhất.
+2. Nhấp đúp `viettam-core-hub.exe` → bấm **Yes** ở hộp thoại quyền Administrator.
    - Nếu Windows hiện *"Windows protected your PC"* (vì file chưa có chữ ký số): bấm **More info → Run anyway**.
-3. Lần đầu chạy, app tự tải **LibreHardwareMonitor v0.9.6** (khoảng 6 MB, có kiểm tra SHA256) vào `%LOCALAPPDATA%\ThermalCoreHUD\lhm`, bật web server nội bộ rồi khởi động nó.
+3. Lần đầu chạy, app tự tải **LibreHardwareMonitor v0.9.6** (khoảng 6 MB, có kiểm tra SHA256) vào `%LOCALAPPDATA%\viettam-core-hub\lhm`, bật web server nội bộ rồi khởi động nó.
    - Nếu hiện hỏi *"PawnIO is not installed, do you want to install it?"* → bấm **OK**. PawnIO là driver đọc cảm biến CPU, chỉ cần cài một lần.
 4. Giao diện mở trong một cửa sổ riêng. **Đóng cửa sổ là app tự thoát**, kèm theo tắt LibreHardwareMonitor nếu chính app đã bật nó.
 5. Mở lại khi app đang chạy thì app chỉ hiện lại cửa sổ, không chạy thêm bản thứ hai.
 
-Nhật ký lỗi nằm ở `%LOCALAPPDATA%\ThermalCoreHUD\thermal-core.log`.
+Nhật ký lỗi nằm ở `%LOCALAPPDATA%\viettam-core-hub\viettam-core-hub.log`.
 
 ### Cách 2 – Chạy từ mã nguồn Python
 Cài Python 3.9+ (`winget install -e --id Python.Python.3.12`), rồi nhấp đúp `start-windows.bat`.
 
-Muốn xem thử giao diện mà không cần cảm biến: `ThermalCoreHUD.exe --demo` hoặc `python app.py --demo`.
+Muốn xem thử giao diện mà không cần cảm biến: `viettam-core-hub.exe --demo` hoặc `python app.py --demo`.
 
 ## 2. Trên máy anh, mỗi đồng hồ đo gì
 
@@ -91,7 +96,7 @@ cảm biến cho từng đồng hồ, ngưỡng cảnh báo, ảnh nhân vật &
 - Chấm màu cạnh tên đồng hồ giữ màu nhận diện (CPU xanh ngọc, GPU hồng, Mainboard lục) giống biểu đồ nhật ký.
 - **Thay ảnh khác** (không bắt buộc): **Cài đặt** → *Ảnh nhân vật & logo* → **CHỌN ẢNH** cho *Nhân vật nam*, *Nhân vật nữ*,
   *Logo công ty*. Ảnh thay thế dùng chung cho mọi mức nhiệt, được thu nhỏ còn tối đa 640 px và lưu trong
-  `%LOCALAPPDATA%\ThermalCoreHUD\brand\` (không gửi ra ngoài). Chỉ nhận PNG/JPG/GIF/WebP (không nhận SVG vì lý do bảo mật).
+  `%LOCALAPPDATA%\viettam-core-hub\brand\` (không gửi ra ngoài). Chỉ nhận PNG/JPG/GIF/WebP (không nhận SVG vì lý do bảo mật).
   Bấm **XOÁ** để quay về ảnh có sẵn.
 - Ảnh nhân vật và logo là tài sản của Công ty TNHH Thiết Bị Việt Tâm, chỉ dùng cho app nội bộ này.
 
@@ -102,7 +107,7 @@ Mỗi hàng là một nhân, mỗi cột là một lần đo trong 60 phút gầ
 Mỗi ổ có: % tuổi thọ còn lại (✓ TỐT / ▲ THEO DÕI dưới 30% / ⛔ NÊN THAY dưới 10%), nhiệt độ so với ngưỡng của nhà sản xuất, tổng dữ liệu đã ghi/đọc, giờ hoạt động, số lần bật, dung lượng đã dùng, vùng dự phòng (NVMe). Ổ gần hết tuổi thọ hoặc hết vùng dự phòng → thanh nhận định nhắc sao lưu. Ổ SATA đời cũ có thể chỉ báo nhiệt độ.
 
 ### Nhật ký nhiệt độ (lưu 7/14/30 ngày)
-- Mỗi lần đo được ghi vào `%LOCALAPPDATA%\ThermalCoreHUD\history.db` (SQLite, khoảng 0,3 MB/ngày). Đổi số ngày lưu trong **CALIBRATE**.
+- Mỗi lần đo được ghi vào `%LOCALAPPDATA%\viettam-core-hub\history.db` (SQLite, khoảng 0,3 MB/ngày). Đổi số ngày lưu trong **CALIBRATE**.
 - Tab **1 GIỜ / 24 GIỜ / 7 NGÀY / 30 NGÀY**: biểu đồ đường CPU/GPU/BOARD (khoảng dài có thêm vùng nhạt = mức cao nhất của CPU), đường đứt nét = ngưỡng cảnh báo.
 - Tóm tắt bằng lời, ví dụ *"Máy thường nóng nhất khoảng 13:00–14:00 (CPU trung bình 71°C, tải 61%)"*.
 - Các ô số: CPU trung bình, cao nhất (kèm thời điểm), số phút vượt ngưỡng, số phút hạ xung do nhiệt.
@@ -131,7 +136,7 @@ LibreHardwareMonitor không báo trực tiếp trạng thái hạ xung, nên app
 
 ### Overlay – 3 đồng hồ nổi ở góc trên bên phải màn hình
 
-Bấm nút **OVERLAY** trên thanh công cụ (hoặc chạy `ThermalCoreHUD.exe --overlay` để chỉ mở overlay). Overlay là cửa sổ không viền, trong suốt mờ (mặc định đậm 55%, cuộn chuột để chỉnh) và **luôn nằm trên mọi app khác**:
+Bấm nút **OVERLAY** trên thanh công cụ (hoặc chạy `viettam-core-hub.exe --overlay` để chỉ mở overlay). Overlay là cửa sổ không viền, trong suốt mờ (mặc định đậm 55%, cuộn chuột để chỉnh) và **luôn nằm trên mọi app khác**:
 
 | Thao tác | Kết quả |
 |---|---|
@@ -182,7 +187,7 @@ Cài đặt cho nguồn B:
 ## 4. Tham số dòng lệnh
 
 ```
-ThermalCoreHUD.exe (hoặc python app.py)
+viettam-core-hub.exe (hoặc python app.py)
     [--port 8787] [--interval 1.0] [--demo]
     [--lhm-url http://127.0.0.1:8085/data.json] [--lhm-auth user:pass] [--no-manage-lhm]
     [--ui auto|window|browser|none] [--overlay] [--keep-running] [--version]
@@ -197,12 +202,12 @@ ThermalCoreHUD.exe (hoặc python app.py)
 
 - `--no-manage-lhm`: không tự tải/bật LibreHardwareMonitor (khi anh tự quản lý LHM).
 - `--keep-running`: không tự thoát khi đóng cửa sổ.
-- Tạo shortcut có tham số: chuột phải exe → Create shortcut → sửa ô *Target*, ví dụ `...\ThermalCoreHUD.exe --interval 0.5`.
+- Tạo shortcut có tham số: chuột phải exe → Create shortcut → sửa ô *Target*, ví dụ `...\viettam-core-hub.exe --interval 0.5`.
 
 ## 5. Kiến trúc
 
 ```
-ThermalCoreHUD.exe (UAC admin) ─ tự tải, cấu hình, khởi động ─┐
+viettam-core-hub.exe (UAC admin) ─ tự tải, cấu hình, khởi động ─┐
                                                               ▼
 LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
       │  http://127.0.0.1:8085/data.json         │ PowerShell, 5 giây/lần
@@ -214,14 +219,14 @@ LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
 ```
 
 - Backend chỉ dùng thư viện chuẩn của Python; overlay cần thêm Pillow (`requirements.txt`).
-- Ngưỡng cảnh báo, đơn vị, lựa chọn cảm biến và vị trí/độ trong suốt của overlay được lưu ở `%LOCALAPPDATA%\ThermalCoreHUD\settings.json`.
+- Ngưỡng cảnh báo, đơn vị, lựa chọn cảm biến và vị trí/độ trong suốt của overlay được lưu ở `%LOCALAPPDATA%\viettam-core-hub\settings.json`.
 - Cả app lẫn web server của LibreHardwareMonitor chỉ nghe trên `127.0.0.1`, máy khác trong mạng LAN không truy cập được.
 - Trên Linux, app đọc `/sys/class/hwmon` và dùng thêm `nvidia-smi` nếu có.
 - App **không bao giờ** tự chuyển sang số liệu giả khi mất cảm biến. Chế độ DEMO chỉ chạy khi gọi `--demo`, hoặc khi mở trực tiếp file HTML mà không có backend, và luôn có nhãn DEMO rõ ràng.
 
 ## 6. Xử lý sự cố
 
-> **Thiếu nhiệt độ mainboard?** Mở **CALIBRATE → XUẤT FILE CHẨN ĐOÁN** và gửi file `thermalcore-chan-doan-….json` cho người hỗ trợ: file cho biết LibreHardwareMonitor có nhận ra chip giám sát mainboard (SuperIO, ví dụ Nuvoton NCT6683D) hay không. Nếu chip có mặt nhưng chỉ trả về 0°C / ≥125°C (kênh không dùng), app tự bỏ qua và dùng nguồn thay thế.
+> **Thiếu nhiệt độ mainboard?** Mở **CALIBRATE → XUẤT FILE CHẨN ĐOÁN** và gửi file `viettam-core-hub-chan-doan-….json` cho người hỗ trợ: file cho biết LibreHardwareMonitor có nhận ra chip giám sát mainboard (SuperIO, ví dụ Nuvoton NCT6683D) hay không. Nếu chip có mặt nhưng chỉ trả về 0°C / ≥125°C (kênh không dùng), app tự bỏ qua và dùng nguồn thay thế.
 >
 > **Lenovo ThinkCentre M910q (và nhiều máy mini/văn phòng):** LibreHardwareMonitor không đọc được cảm biến mainboard của dòng này (không hỗ trợ chip giám sát của Lenovo, không có nhiệt độ PCH). App tự dùng nhiệt độ ổ SSD (nằm trên mainboard) và ghi nhãn **THAY THẾ**. Đây là giới hạn phần cứng/driver, không phải lỗi app.
 >
@@ -232,7 +237,7 @@ LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
 | Băng vàng: *"Không kết nối được LibreHardwareMonitor"* | LHM chưa chạy, hoặc web server chưa bật | Thoát app rồi mở lại (app tự sửa cấu hình). Hoặc mở LHM → Options → Remote Web Server → Run |
 | Băng vàng: *"Không chuẩn bị được LibreHardwareMonitor"* | Không có mạng ở lần chạy đầu, hoặc bị chặn tải | Kết nối mạng rồi mở lại. Hoặc tải `LibreHardwareMonitor.zip` v0.9.6, giải nén vào thư mục `lhm\` đặt cạnh exe |
 | CPU báo `NO SENSOR` | Chưa cài PawnIO | Thoát app, mở lại, đồng ý cài PawnIO khi được hỏi |
-| Windows Defender báo `ThermalCoreHUD.exe` là virus | Báo nhầm, thường gặp với exe đóng gói bằng PyInstaller | Đối chiếu mã SHA256 ở trang Release (`Get-FileHash ThermalCoreHUD.exe`); nếu khớp thì Allow trong Protection history. Hoặc dùng Cách 2 (chạy từ mã nguồn) |
+| Windows Defender báo `viettam-core-hub.exe` là virus | Báo nhầm, thường gặp với exe đóng gói bằng PyInstaller | Đối chiếu mã SHA256 ở trang Release (`Get-FileHash viettam-core-hub.exe`); nếu khớp thì Allow trong Protection history. Hoặc dùng Cách 2 (chạy từ mã nguồn) |
 | Windows chặn exe hoặc LHM | Smart App Control / SmartScreen | Bấm More info → Run anyway; hoặc chuột phải → Properties → Unblock |
 | Mainboard luôn hiện **THAY THẾ** (SSD) | Firmware không cho đọc ACPI thermal zone qua WMI | Bình thường với nhiều laptop; có thể chọn cảm biến khác ở menu |
 | Nút OVERLAY bị mờ | Bản chạy từ mã nguồn thiếu Pillow | `py -3 -m pip install -r requirements.txt` (bản .exe đã có sẵn) |
@@ -240,13 +245,13 @@ LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
 
 ## 7. Build file .exe
 
-- **Tự động**: mỗi lần push thay đổi trong `thermal-monitor/`, GitHub Actions (`.github/workflows/thermal-core-hud.yml`) build trên Windows, chạy unit test, chạy thử exe (chế độ demo và chế độ thật có tự tải LHM), rồi đăng `ThermalCoreHUD.exe` cùng mã SHA256 lên trang Releases.
-- **Thủ công** trên máy Windows có Python: chạy `build-exe.bat` → `dist\ThermalCoreHUD.exe`.
+- **Tự động**: mỗi lần push thay đổi trong `thermal-monitor/`, GitHub Actions (`.github/workflows/viettam-core-hub.yml`) build trên Windows, chạy unit test, chạy thử exe (chế độ demo và chế độ thật có tự tải LHM), rồi đăng `viettam-core-hub.exe` cùng mã SHA256 lên trang Releases.
+- **Thủ công** trên máy Windows có Python: chạy `build-exe.bat` → `dist\viettam-core-hub.exe`.
 
 ## 8. Tác giả và giấy phép bên thứ ba
 
-**Thermal Core HUD** – thiết kế & phát triển: **Nguyễn Quốc Tiến** (`nguyenquoctien`). Chữ ký tác giả có ở chân trang,
-chìm trong nền giao diện, trong thông tin file (`ThermalCoreHUD.exe` → Properties → Details) và trong `/api/info`.
+**VietTam Core Hub** – thiết kế & phát triển: **Nguyễn Quốc Tiến** (`nguyenquoctien`). Chữ ký tác giả có ở chân trang,
+chìm trong nền giao diện, trong thông tin file (`viettam-core-hub.exe` → Properties → Details) và trong `/api/info`.
 
 Toàn bộ mã nguồn trong thư mục `thermal-monitor/` được viết riêng cho dự án này. App dùng các thành phần mã nguồn mở / miễn phí sau
 (không sửa đổi mã của chúng):

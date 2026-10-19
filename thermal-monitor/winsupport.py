@@ -45,9 +45,31 @@ def app_dir() -> str:
     return os.path.dirname(os.path.abspath(__file__))
 
 
+DATA_DIR_NAME = "viettam-core-hub"
+LEGACY_DATA_DIRS = ("ThermalCoreHUD",)  # tên thư mục của bản ≤ 1.9.1 (Thermal Core HUD)
+
+
+def adopt_legacy_dir(path: str, legacy: list[str]) -> None:
+    """App đổi tên: chuyển thư mục dữ liệu cũ sang tên mới để giữ cài đặt, nhật ký, ảnh nhân vật, LHM đã tải."""
+    if os.path.exists(path):
+        return
+    for old in legacy:
+        if not os.path.isdir(old):
+            continue
+        try:
+            os.rename(old, path)
+        except OSError:  # bản cũ / LHM của bản cũ đang chạy giữ file -> sao chép phần đọc được
+            try:
+                shutil.copytree(old, path, ignore=shutil.ignore_patterns("*.log", "browser"), dirs_exist_ok=True)
+            except (shutil.Error, OSError):
+                pass
+        return
+
+
 def data_dir() -> str:
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    path = os.path.join(base, "ThermalCoreHUD")
+    path = os.path.join(base, DATA_DIR_NAME)
+    adopt_legacy_dir(path, [os.path.join(base, d) for d in LEGACY_DATA_DIRS])
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -67,7 +89,7 @@ def is_admin() -> bool:
         return False
 
 
-def message_box(text: str, title: str = "Thermal Core HUD", error: bool = True) -> None:
+def message_box(text: str, title: str = "VietTam Core Hub", error: bool = True) -> None:
     try:
         ctypes.windll.user32.MessageBoxW(None, text, title, 0x10 if error else 0x40)
     except (AttributeError, OSError):
@@ -97,7 +119,7 @@ def install_lhm_from_zip(data: bytes, dest: str, expected_sha256: str = LHM_SHA2
 
 def download_lhm(dest: str, log=print) -> None:
     log(f"Đang tải LibreHardwareMonitor {LHM_VERSION}...")
-    req = urllib.request.Request(LHM_URL, headers={"User-Agent": "ThermalCoreHUD"})
+    req = urllib.request.Request(LHM_URL, headers={"User-Agent": "viettam-core-hub"})
     with urllib.request.urlopen(req, timeout=60) as resp:
         data = resp.read()
     install_lhm_from_zip(data, dest)

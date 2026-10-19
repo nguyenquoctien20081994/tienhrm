@@ -1,9 +1,9 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title Thermal Core HUD
+title VietTam Core Hub
 
-:: Chay tu ma nguon Python. Cach don gian hon: dung ThermalCoreHUD.exe (trang Releases).
+:: Chay tu ma nguon Python. Cach don gian hon: dung viettam-core-hub.exe (trang Releases).
 :: LibreHardwareMonitor can quyen Administrator de doc nhiet do CPU -> tu nang quyen 1 lan.
 net session >nul 2>&1
 if errorlevel 1 (
@@ -20,7 +20,7 @@ where py >nul 2>&1 && set "PY=py -3"
 if not defined PY ( python -c "import sys" >nul 2>&1 && set "PY=python" )
 if not defined PY (
     echo Chua co Python 3.9+. Cai bang lenh: winget install -e --id Python.Python.3.12
-    echo Hoac dung ban ThermalCoreHUD.exe khong can Python.
+    echo Hoac dung ban viettam-core-hub.exe khong can Python.
     pause & exit /b 1
 )
 
