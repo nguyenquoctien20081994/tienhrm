@@ -130,6 +130,12 @@
           <option value="30">30 giây</option><option value="60">60 giây</option>
         </select>
       </label>
+      <label class="settings-interval">Nguồn nhiệt độ mainboard
+        <select id="selBoardSrc">
+          <option value="auto">A – LibreHardwareMonitor / ổ SSD thay thế</option>
+          <option value="hwinfo">B – HWiNFO</option>
+        </select>
+      </label>
       <label class="settings-interval">Lưu nhật ký nhiệt độ
         <select id="selHistory">
           <option value="7">7 ngày</option><option value="14">14 ngày</option><option value="30">30 ngày</option>
@@ -161,6 +167,12 @@
       </div>
       <canvas class="spark"></canvas>
       <div class="tele"></div>
+      <div class="src-switch" hidden title="Nguồn nhiệt độ mainboard">
+        <span>NGUỒN</span>
+        <button type="button" data-src="auto" title="A: LibreHardwareMonitor; máy không có cảm biến mainboard thì dùng nhiệt độ ổ SSD">A · LHM/SSD</button>
+        <button type="button" data-src="hwinfo" title="B: lấy từ HWiNFO (cần chạy HWiNFO và bật Shared Memory Support)">B · HWiNFO</button>
+        <em class="src-state"></em>
+      </div>
       <div class="card-foot"><span class="hw">—</span><span class="state">STANDBY</span></div>
     </section>
   </template>

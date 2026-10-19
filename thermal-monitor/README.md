@@ -120,6 +120,21 @@ Ngưỡng mặc định:
 | GPU (iGPU) | 85 °C | 95 °C | Chung đế với CPU |
 | Mainboard | 65 °C | 80 °C | EC/SSD; SSD NVMe thường bắt đầu giảm tốc (throttle) quanh 70–80 °C |
 
+### Nguồn nhiệt độ mainboard: A hoặc B
+Trên thẻ **MAINBOARD** có nút **NGUỒN A · LHM/SSD / B · HWiNFO** (cũng chỉnh được trong **CALIBRATE**):
+
+| | A – LHM / ổ SSD (mặc định) | B – HWiNFO |
+|---|---|---|
+| Lấy số từ | LibreHardwareMonitor; máy không có cảm biến mainboard thì dùng nhiệt độ ổ SSD (nhãn THAY THẾ) | Phần mềm HWiNFO – nhận diện được nhiều chip mainboard mà LHM chưa hỗ trợ (vd. Lenovo ThinkCentre M910q) |
+| Cần cài thêm | Không | HWiNFO (miễn phí) |
+| Hạn chế | Không có nhiệt độ mainboard thật trên một số máy | Bản miễn phí **tự tắt chia sẻ sau 12 giờ**, phải bật lại; bản Pro không giới hạn |
+
+Cài đặt cho nguồn B:
+1. Tải HWiNFO từ trang chính thức `hwinfo.com`, cài và mở bằng chế độ **Sensors-only**.
+2. Vào **Settings** (biểu tượng bánh răng) → đánh dấu **Shared Memory Support** → OK. Có thể bật thêm *Auto Start* để HWiNFO chạy cùng Windows.
+3. Trong Thermal Core, bấm **B · HWiNFO**. Bên cạnh nút hiện **✓ đang dùng** nếu đọc được.
+4. Nếu hiện **⚠ lỗi → tạm dùng A** (rê chuột để xem lý do): HWiNFO chưa chạy, chưa bật chia sẻ, hoặc đã hết 12 giờ – bật lại Shared Memory Support trong HWiNFO. Trong lúc đó đồng hồ MAINBOARD tự dùng nguồn A, không bị trống.
+
 ## 4. Tham số dòng lệnh
 
 ```

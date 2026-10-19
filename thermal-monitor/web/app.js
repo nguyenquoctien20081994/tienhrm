@@ -26,6 +26,7 @@
     unit: store.get("unit", "C"),
     interval: 6,
     historyDays: 30,
+    boardSource: "auto",
     ui: store.get("ui", { style: "hud", theme: "auto" }),
     sound: false,
     thresholds: store.get("thresholds", {}),
@@ -53,6 +54,8 @@
       settings.unit = s.unit === "F" ? "F" : "C";
       settings.interval = s.interval || 6;
       settings.historyDays = s.history_days || 30;
+      settings.boardSource = s.board_source || "auto";
+      updateSourceSwitch();
       settings.ui = { style: "hud", theme: "auto", ...(s.ui || {}) };
       store.set("ui", settings.ui);
       applyTheme(); updateStyleButton();
@@ -116,6 +119,29 @@
   });
 
   function resetStats(g) { g.hist = []; g.min = g.max = null; }
+
+  // ---- chọn nguồn nhiệt độ mainboard: A (LHM / ổ SSD) hoặc B (HWiNFO)
+  const boardCard = gauges.find((g) => g.cfg.key === "board").el;
+  const srcSwitch = $(".src-switch", boardCard);
+  srcSwitch.hidden = false;
+  function setBoardSource(v) {
+    settings.boardSource = v;
+    saveServer({ board_source: v });
+    resetStats(gauges.find((g) => g.cfg.key === "board"));
+    updateSourceSwitch();
+  }
+  function updateSourceSwitch(status) {
+    for (const b of srcSwitch.querySelectorAll("button")) b.classList.toggle("on", b.dataset.src === settings.boardSource);
+    const st = $(".src-state", srcSwitch);
+    if (settings.boardSource !== "hwinfo" || !status) { st.textContent = ""; st.title = ""; srcSwitch.dataset.state = ""; return; }
+    srcSwitch.dataset.state = status.active ? "ok" : "fail";
+    st.textContent = status.active ? "✓ đang dùng" : "⚠ lỗi → tạm dùng A";
+    st.title = status.error || "";
+  }
+  srcSwitch.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-src]");
+    if (b && b.dataset.src !== settings.boardSource) setBoardSource(b.dataset.src);
+  });
 
   // ------------------------------------------------------------------ vẽ tĩnh (vành, mặt số, vạch chia)
   function buildLayers(g) {
@@ -634,6 +660,7 @@
     renderVerdict(snap.assessment);
     if (snap.version) $("#footVersion").textContent = `THERMAL CORE HUD v${snap.version}`;
     renderTele(snap);
+    updateSourceSwitch(snap.metrics?.board_source);
     renderBank(snap);
     checkAlarm();
     if (fresh) document.dispatchEvent(new CustomEvent("tch:snapshot", { detail: { snap, demo: state.demo } }));
@@ -933,6 +960,7 @@
     fillSettings();
     $("#selInterval").value = String(settings.interval);
     $("#selHistory").value = String(settings.historyDays);
+    $("#selBoardSrc").value = settings.boardSource;
     dlg.showModal();
   };
   $("#btnReset").onclick = () => fillSettings(true);
@@ -947,6 +975,7 @@
     store.set("thresholds", settings.thresholds);
     settings.interval = Number($("#selInterval").value) || 6;
     settings.historyDays = Number($("#selHistory").value) || 30;
+    if ($("#selBoardSrc").value !== settings.boardSource) setBoardSource($("#selBoardSrc").value);
     saveServer({ thresholds: settings.thresholds, interval: settings.interval, history_days: settings.historyDays });
     document.dispatchEvent(new CustomEvent("tch:settings"));
     rebuildAll();

@@ -317,6 +317,14 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
 .card[data-key="cpu"] { --accent: var(--acc-cpu); }
 .card[data-key="gpu"] { --accent: var(--acc-gpu); }
 .card[data-key="board"] { --accent: var(--acc-board); }
+.src-switch { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 8px; font-size: 10px; }
+.src-switch[hidden] { display: none; }
+.src-switch > span { letter-spacing: 0.15em; color: var(--muted); margin-right: 2px; }
+.src-switch button { padding: 4px 8px; font-size: 10px; letter-spacing: 0.08em; }
+.src-switch button.on { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 35%, transparent); }
+.src-switch em { font-style: normal; font-family: var(--font-mono); font-size: 10px; }
+.src-switch[data-state="ok"] em { color: var(--green); }
+.src-switch[data-state="fail"] em { color: var(--amber); }
 .tele span.throttle-thermal { border-color: var(--red); color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
 .tele span.throttle-power { border-color: var(--amber); color: var(--amber); }
 

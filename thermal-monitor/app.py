@@ -29,7 +29,7 @@ import history
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.4.2"
+APP_VERSION = "1.5.0"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
 FROZEN = getattr(sys, "frozen", False)
@@ -52,12 +52,14 @@ INTERVAL_CHOICES = (5, 6, 10, 15, 30, 60)
 SETTINGS_VERSION = 3  # 2: chu kỳ mặc định 15 s -> 6 s; 3: overlay trong suốt thêm 30%
 HISTORY_DAY_CHOICES = (7, 14, 30)
 UI_STYLES = ("hud", "cockpit")
+BOARD_SOURCES = ("auto", "hwinfo")  # A: LHM (thiếu thì dùng ổ SSD) / B: HWiNFO
 UI_THEMES = ("auto", "night", "day")
 DEFAULT_SETTINGS = {
     "unit": "C",
     "settings_version": SETTINGS_VERSION,
     "interval": 6,  # giây giữa 2 lần đọc cảm biến
     "history_days": 30,  # số ngày giữ nhật ký nhiệt độ
+    "board_source": "auto",  # nguồn nhiệt độ mainboard: "auto" (A) hoặc "hwinfo" (B)
     "ui": {"style": "hud", "theme": "auto"},  # đồng hồ cơ / buồng lái; ngày / đêm / tự động theo giờ
     # Ngưỡng cho ThinkPad X1 Yoga Gen 5 (i7-10610U, TjMax 100 °C; iGPU chung đế với CPU)
     "thresholds": {"cpu": {"warn": 85, "crit": 95}, "gpu": {"warn": 85, "crit": 95},
@@ -99,6 +101,10 @@ def validate_settings_patch(patch) -> dict:
         if patch["interval"] not in INTERVAL_CHOICES:
             raise ValueError(f"interval phải là một trong {INTERVAL_CHOICES}")
         out["interval"] = patch["interval"]
+    if "board_source" in patch:
+        if patch["board_source"] not in BOARD_SOURCES:
+            raise ValueError(f"board_source phải là một trong {BOARD_SOURCES}")
+        out["board_source"] = patch["board_source"]
     if "history_days" in patch:
         if patch["history_days"] not in HISTORY_DAY_CHOICES:
             raise ValueError(f"history_days phải là một trong {HISTORY_DAY_CHOICES}")
@@ -522,7 +528,7 @@ def main() -> None:
         provider = sensors.DemoAuto()
     else:
         lhm_url = args.lhm_url or (DEFAULT_LHM_URL if IS_WINDOWS else None)
-        provider = sensors.AutoProvider(lhm_url, args.lhm_auth)
+        provider = sensors.AutoProvider(lhm_url, args.lhm_auth, board_source_fn=lambda: store.get()["board_source"])
         if IS_WINDOWS and not args.no_manage_lhm and not args.lhm_url:
             manager = winsupport.LhmManager()
             threading.Thread(target=manager.ensure_running, daemon=True).start()
@@ -571,7 +577,8 @@ def main() -> None:
 
     sampler = Sampler(provider, interval, store.get, status_fn=(lambda: manager.status) if manager else None,
                       extra_fn=lambda: {"overlay": None if ctl is None else ctl.visible}, db=db)
-    store.listeners.append(lambda patch: "interval" in patch and sampler.wake.set())  # đo lại ngay theo chu kỳ mới
+    # Đổi chu kỳ hoặc nguồn mainboard -> đo lại ngay
+    store.listeners.append(lambda patch: ("interval" in patch or "board_source" in patch) and sampler.wake.set())
     if ctl is not None:
         ctl.on_change = sampler.republish  # nút OVERLAY trên giao diện cập nhật ngay
     sampler.start()

@@ -65,7 +65,7 @@ _PRIMARY_PREFS = {
             "package id 0", "package", "core average", "core max", "cpu"],
     "gpu": ["gpu core", "gpu temperature", "edge", "junction", "gpu hot spot", "core", "gpu"],
     "board": ["motherboard", "mainboard", "system", "systin", "pch", "chipset",
-              "acpi", "thermal zone", "temperature"],
+              "acpi", "thermal zone", "temperature", "temp", "auxiliary"],
 }
 
 
@@ -604,8 +604,40 @@ class DemoProvider:
 # Bộ tổng hợp
 # ---------------------------------------------------------------------------
 
+_HW_BOARD_RE = re.compile(r"nuvoton|nct\d|\bite\b|it8\d|fintek|winbond|smsc|super ?i/?o|\blpc\b|embedded controller|"
+                          r"^system|motherboard|mainboard|chipset|\bpch\b|acpi|\blenovo\b|\basus\b|\bgigabyte\b|\bmsi\b|"
+                          r"\basrock\b|\bdell\b|\bhp\b")
+
+
+def hwinfo_category(device: str) -> str:
+    """Nhóm của một thiết bị trong HWiNFO ("CPU [#0]: …", "GPU [#0]: …", "S.M.A.R.T.: …", "LENOVO 310B (Nuvoton …)")."""
+    d = device.lower()
+    if d.startswith("cpu") or "cpu [" in d:
+        return "cpu"
+    if d.startswith("gpu") or "gpu [" in d:
+        return "gpu"
+    if d.startswith(("s.m.a.r.t", "drive", "smart")):
+        return "storage"
+    if _HW_BOARD_RE.search(d):
+        return "board"
+    return "other"
+
+
+def hwinfo_board_sensors(temps: list[dict]) -> list[Sensor]:
+    """Nhiệt độ mainboard (và các nhiệt độ chưa rõ nhóm) từ HWiNFO. CPU/GPU/ổ đã có từ LHM nên bỏ qua."""
+    out = []
+    for t in temps:
+        cat = hwinfo_category(t["device"])
+        if cat not in ("board", "other"):
+            continue
+        out.append(Sensor(id=f"hwinfo/{t['key']}", name=t["label"], hardware=f"HWiNFO · {t['device']}",
+                          category=cat, value=_round(_plausible(t["value"], cat))))
+    return out
+
+
 class AutoProvider:
-    def __init__(self, lhm_url: str | None, lhm_auth: str | None = None):
+    def __init__(self, lhm_url: str | None, lhm_auth: str | None = None, board_source_fn=None):
+        self.board_source_fn = board_source_fn or (lambda: "auto")  # "auto" (A) | "hwinfo" (B)
         is_windows = sys.platform.startswith("win")
         self.lhm = LhmHttpProvider(lhm_url, lhm_auth) if lhm_url else None
         self.hwmon = LinuxHwmonProvider() if sys.platform.startswith("linux") else None
@@ -649,6 +681,27 @@ class AutoProvider:
                 sensors += got
                 sources.append(self.nvsmi.name)
 
+        # Nguồn B: nhiệt độ mainboard từ HWiNFO (nhận diện được nhiều chip mà LHM chưa hỗ trợ)
+        board_src = {"selected": self.board_source_fn(), "active": False}
+        if board_src["selected"] == "hwinfo":
+            try:
+                import hwinfo
+
+                data = hwinfo.parse(hwinfo.read_shared_memory())
+                hw = hwinfo_board_sensors(hwinfo.temperatures(data))
+                if hwinfo.is_stale(data):
+                    raise hwinfo.HwinfoUnavailable("HWiNFO không còn cập nhật số liệu (đang tạm dừng hoặc bị treo).")
+                if not any(x.category == "board" and x.value is not None for x in hw):
+                    raise hwinfo.HwinfoUnavailable("HWiNFO đang chạy nhưng không có nhiệt độ mainboard cho máy này.")
+                # Đã có nguồn B: bỏ cảm biến mainboard của LHM để đồng hồ MAINBOARD dùng đúng số của HWiNFO
+                sensors = [x for x in sensors if x.category != "board"] + hw
+                sources.append("HWiNFO")
+                board_src["active"] = True
+            except Exception as exc:  # noqa: BLE001 - nguồn B lỗi thì quay về A, không làm dừng việc đo
+                board_src["error"] = str(exc)
+                messages.append(f"Nguồn mainboard B (HWiNFO): {exc} Đang tạm dùng nguồn A.")
+        metrics["board_source"] = board_src
+
         # Laptop thường không có chip SuperIO -> thử vùng nhiệt ACPI làm nhiệt độ "mainboard".
         if self.acpi and not any(s.category == "board" for s in sensors):
             got = self.acpi.read()
@@ -680,6 +733,14 @@ def diagnostics(provider) -> dict:
     acpi = getattr(provider, "acpi", None)
     if acpi is not None:
         out["acpi"] = {"values": [asdict(s) for s in acpi.read()], "error": acpi.error}
+    if sys.platform.startswith("win"):
+        try:
+            import hwinfo
+
+            data = hwinfo.parse(hwinfo.read_shared_memory())
+            out["hwinfo"] = [{**t, "category": hwinfo_category(t["device"])} for t in hwinfo.temperatures(data)]
+        except Exception as exc:  # noqa: BLE001 - ghi lại lý do để chẩn đoán
+            out["hwinfo_error"] = str(exc)
     hwmon = getattr(provider, "hwmon", None)
     if hwmon is not None:
         out["hwmon"] = [asdict(s) for s in hwmon.read()]
