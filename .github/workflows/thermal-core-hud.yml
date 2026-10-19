@@ -1,0 +1,108 @@
+name: Thermal Core HUD (Windows .exe)
+
+on:
+  push:
+    paths:
+      - "thermal-monitor/**"
+      - ".github/workflows/thermal-core-hud.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: thermal-monitor
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Install PyInstaller
+        run: |
+          # Tự biên dịch bootloader để giảm cảnh báo nhầm của phần mềm diệt virus; lỗi thì dùng bản dựng sẵn
+          python -m pip install --upgrade pip wheel
+          python -m pip install --no-binary pyinstaller "pyinstaller==6.11.1"
+          if ($LASTEXITCODE -ne 0) { python -m pip install "pyinstaller==6.11.1" }
+
+      - name: Build ThermalCoreHUD.exe
+        run: >
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --uac-admin
+          --name ThermalCoreHUD --icon assets/icon.ico --version-file version_info.txt
+          --add-data "web;web" app.py
+
+      - name: Smoke test - demo mode
+        run: |
+          $p = Start-Process dist/ThermalCoreHUD.exe -ArgumentList '--demo','--ui','none','--port','8790' -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 30 -and -not $ok; $i++) {
+            Start-Sleep 1
+            try { $s = Invoke-RestMethod http://127.0.0.1:8790/api/snapshot; $ok = $s.mode -eq 'demo' -and $s.sensors.Count -gt 0 } catch {}
+          }
+          $html = (Invoke-WebRequest http://127.0.0.1:8790/ -UseBasicParsing).Content
+          Stop-Process -Id $p.Id -Force
+          if (-not $ok -or $html -notmatch 'THERMAL') { throw 'Demo smoke test failed' }
+          Write-Host "Demo OK: $($s.sensors.Count) sensors, version $($s.version)"
+
+      - name: Smoke test - real mode (auto-download LibreHardwareMonitor)
+        run: |
+          $p = Start-Process dist/ThermalCoreHUD.exe -ArgumentList '--ui','none','--port','8791' -PassThru
+          $lhm = Join-Path $env:LOCALAPPDATA 'ThermalCoreHUD/lhm'
+          $ok = $false
+          for ($i = 0; $i -lt 90 -and -not $ok; $i++) {
+            Start-Sleep 1
+            $ok = (Test-Path "$lhm/LibreHardwareMonitor.exe") -and (Test-Path "$lhm/LibreHardwareMonitor.config")
+          }
+          Start-Sleep 5
+          $s = Invoke-RestMethod http://127.0.0.1:8791/api/snapshot
+          Write-Host "Source: $($s.source) | mode: $($s.mode) | sensors: $($s.sensors.Count)"
+          $s.messages | ForEach-Object { Write-Host "  ! $_" }
+          $s.sensors | ForEach-Object { Write-Host "  - [$($_.category)] $($_.name) = $($_.value) ($($_.hardware))" }
+          Get-Content "$lhm/LibreHardwareMonitor.config"
+          Stop-Process -Id $p.Id -Force
+          Get-Process LibreHardwareMonitor -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not $ok) { throw 'LibreHardwareMonitor was not installed/configured' }
+
+      - name: Checksum
+        id: meta
+        run: |
+          $hash = (Get-FileHash dist/ThermalCoreHUD.exe -Algorithm SHA256).Hash
+          $ver = python -c "import re;print(re.search(r'APP_VERSION = \"(.+?)\"', open('app.py', encoding='utf-8').read()).group(1))"
+          "$hash  ThermalCoreHUD.exe" | Out-File dist/ThermalCoreHUD.exe.sha256 -Encoding ascii
+          "sha256=$hash" >> $env:GITHUB_OUTPUT
+          "version=$ver" >> $env:GITHUB_OUTPUT
+          Write-Host "v$ver SHA256 $hash"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ThermalCoreHUD-${{ steps.meta.outputs.version }}
+          path: |
+            thermal-monitor/dist/ThermalCoreHUD.exe
+            thermal-monitor/dist/ThermalCoreHUD.exe.sha256
+
+      - name: Publish GitHub release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "thermal-core-hud-v${{ steps.meta.outputs.version }}-b${{ github.run_number }}"
+          $notes = @"
+          Thermal Core HUD v${{ steps.meta.outputs.version }} (build ${{ github.run_number }}, commit ${{ github.sha }})
+
+          Tải ThermalCoreHUD.exe, nhấp đúp, bấm Yes ở hộp thoại quyền Administrator.
+          Lần đầu chạy app tự tải LibreHardwareMonitor v0.9.6 (có kiểm tra SHA256).
+
+          SHA256: ${{ steps.meta.outputs.sha256 }}
+          "@
+          gh release create $tag dist/ThermalCoreHUD.exe dist/ThermalCoreHUD.exe.sha256 `
+            --target "${{ github.sha }}" --title "Thermal Core HUD v${{ steps.meta.outputs.version }} (build ${{ github.run_number }})" `
+            --notes $notes --latest
