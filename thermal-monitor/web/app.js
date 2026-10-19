@@ -126,13 +126,27 @@
   srcSwitch.hidden = false;
   function setBoardSource(v) {
     settings.boardSource = v;
-    saveServer({ board_source: v });
-    resetStats(gauges.find((g) => g.cfg.key === "board"));
-    updateSourceSwitch();
+    // Đổi nguồn thì đồng hồ MAINBOARD quay về AUTO – cảm biến chọn tay (vd. ổ SSD) sẽ che mất nguồn mới
+    const g = gauges.find((x) => x.cfg.key === "board");
+    delete settings.picks.board;
+    store.set("picks", settings.picks);
+    g.pick.value = "auto";
+    saveServer({ board_source: v, picks: settings.picks });
+    resetStats(g);
+    updateSourceSwitch(state.snap && state.snap.metrics && state.snap.metrics.board_source);
+    if (state.snap) applySnapshot(state.snap, true);
   }
   function updateSourceSwitch(status) {
     for (const b of srcSwitch.querySelectorAll("button")) b.classList.toggle("on", b.dataset.src === settings.boardSource);
     const st = $(".src-state", srcSwitch);
+    const manual = settings.picks.board && settings.picks.board !== "auto";
+    if (manual) {
+      // Chọn tay một cảm biến thì nguồn A/B không còn tác dụng với đồng hồ này
+      srcSwitch.dataset.state = "fail";
+      st.textContent = "⚠ đang chọn tay → chọn AUTO";
+      st.title = "Ô chọn cảm biến phía trên đang khoá vào 1 cảm biến cụ thể, nên nút A/B không đổi được số hiển thị. Chọn AUTO để dùng nguồn A/B.";
+      return;
+    }
     if (settings.boardSource !== "hwinfo" || !status) { st.textContent = ""; st.title = ""; srcSwitch.dataset.state = ""; return; }
     srcSwitch.dataset.state = status.active ? "ok" : "fail";
     st.textContent = status.active ? "✓ đang dùng" : "⚠ lỗi → tạm dùng A";

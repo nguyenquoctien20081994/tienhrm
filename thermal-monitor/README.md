@@ -138,6 +138,12 @@ Cài đặt cho nguồn B:
    Ở tab đầu tiên (**General / User Interface**) đánh dấu **Shared Memory Support** → OK. Có thể bật thêm *Auto Start* để HWiNFO chạy cùng Windows.
 3. Trong Thermal Core, bấm **B · HWiNFO**. Bên cạnh nút hiện **✓ đang dùng** nếu đọc được.
 4. Nếu hiện **⚠ lỗi → tạm dùng A** (rê chuột để xem lý do): HWiNFO chưa chạy, chưa bật chia sẻ, hoặc đã hết 12 giờ – bật lại Shared Memory Support trong HWiNFO. Trong lúc đó đồng hồ MAINBOARD tự dùng nguồn A, không bị trống.
+5. Ô chọn cảm biến của thẻ MAINBOARD phải để **AUTO** thì nút A/B mới có tác dụng. Nếu đang chọn tay một cảm biến
+   (vd. *Composite Temperature — WDC PC SN730*), bên cạnh nút hiện **⚠ đang chọn tay → chọn AUTO**. Từ bản 1.5.1, bấm đổi A/B
+   sẽ tự đưa ô này về AUTO.
+6. Với Lenovo ThinkCentre (chip **Nuvoton NCT6685D**), nguồn B lấy **PCH Core** làm nhiệt độ mainboard. Các kênh HWiNFO
+   không có tên (thường là chân cảm biến bỏ trống, số liệu vô nghĩa như 76/87/66 °C) chỉ hiện trong SENSOR ARRAY với tên
+   *Kênh không tên #n*, không dùng để đánh giá nhiệt độ.
 
 ## 4. Tham số dòng lệnh
 

@@ -38,6 +38,14 @@ M910Q = build_shm(
      (3, 1, "CPU", "RPM", 1450.0), (1, 2, "Drive Temperature", "°C", 36.0), (1, 3, "DIMM[0] Temperature", "°C", 39.5)])
 
 
+# Bố cục thật từ ảnh HWiNFO của M910q: chip NCT6685D có 3 kênh không tên (76/87/66°C) + cảm biến PCH riêng
+M910Q_NCT6685D = build_shm(
+    ["CPU [#0]: Intel Core i5-6500T: DTS", "LENOVO 310B (Nuvoton NCT6685D)", "LENOVO 310B (Intel PCH)"],
+    [(1, 0, "CPU Package", "°C", 44.0), (1, 1, "CPU0 PECI", "°C", 43.0), (1, 1, "PCH Core", "°C", 46.0),
+     (1, 1, "TD0P", "°C", 40.0), (1, 1, "TD1P", "°C", 41.0), (1, 1, "TD2P", "°C", 38.0), (1, 1, "T7", "°C", 35.0),
+     (1, 1, "", "°C", 76.0), (1, 1, "", "°C", 87.0), (1, 1, "", "°C", 66.0), (1, 2, "PCH Temperature", "°C", 47.0)])
+
+
 class Parse(unittest.TestCase):
     def test_layout(self):
         d = hwinfo.parse(M910Q)
@@ -96,6 +104,16 @@ class SourceB(unittest.TestCase):
         self.assertTrue(snap["metrics"]["board_source"]["active"])
         self.assertNotIn("Temp2", [s["name"] for s in snap["sensors"] if s["value"] is not None])  # 0°C = rác
         self.assertFalse(snap["messages"])
+
+    def test_b_nct6685d_picks_pch_not_unnamed_channels(self):
+        with mock.patch("hwinfo.read_shared_memory", return_value=M910Q_NCT6685D):
+            snap = sensors.snapshot(self.provider("hwinfo").read())
+        board = next(s for s in snap["sensors"] if s["id"] == snap["primary"]["board"])
+        self.assertEqual((board["name"], board["value"]), ("PCH Core", 46.0))
+        unnamed = [s for s in snap["sensors"] if s["name"].startswith("Kênh không tên")]
+        self.assertEqual([(s["name"], s["category"], s["value"]) for s in unnamed],
+                         [("Kênh không tên #1", "other", 76.0), ("Kênh không tên #2", "other", 87.0),
+                          ("Kênh không tên #3", "other", 66.0)])
 
     def test_b_falls_back_to_a_when_hwinfo_missing(self):
         with mock.patch("hwinfo.read_shared_memory", side_effect=hwinfo.HwinfoUnavailable("Chưa thấy HWiNFO.")):

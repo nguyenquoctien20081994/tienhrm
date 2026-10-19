@@ -47,6 +47,14 @@ class SettingsStoreTest(unittest.TestCase):
             self.assertEqual(reloaded["overlay"], {"enabled": False, "opacity": 0.5, "x": 10, "y": 20})
             self.assertEqual(reloaded["thresholds"]["cpu"], {"warn": 85, "crit": 95})
 
+    def test_switching_board_source_drops_manual_board_pick(self):
+        s = app.SettingsStore(None)
+        s.update({"picks": {"cpu": "c", "board": "/nvme/0/temperature/0"}})
+        s.update({"board_source": "auto"})  # không đổi nguồn -> giữ lựa chọn
+        self.assertEqual(s.get()["picks"]["board"], "/nvme/0/temperature/0")
+        s.update({"board_source": "hwinfo"})
+        self.assertEqual(s.get()["picks"], {"cpu": "c"})
+
     def test_corrupt_file_uses_defaults(self):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "settings.json")

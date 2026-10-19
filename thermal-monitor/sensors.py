@@ -626,11 +626,18 @@ def hwinfo_category(device: str) -> str:
 def hwinfo_board_sensors(temps: list[dict]) -> list[Sensor]:
     """Nhiệt độ mainboard (và các nhiệt độ chưa rõ nhóm) từ HWiNFO. CPU/GPU/ổ đã có từ LHM nên bỏ qua."""
     out = []
+    unnamed = 0
     for t in temps:
         cat = hwinfo_category(t["device"])
         if cat not in ("board", "other"):
             continue
-        out.append(Sensor(id=f"hwinfo/{t['key']}", name=t["label"], hardware=f"HWiNFO · {t['device']}",
+        name = t["label"]
+        if not name:
+            # Kênh chip không có tên (vd. NCT6685D của Lenovo: 76/87/66°C) – thường là chân bỏ trống,
+            # không rõ đo gì -> vẫn hiện trong SENSOR ARRAY nhưng không dùng làm nhiệt độ mainboard.
+            unnamed += 1
+            name, cat = f"Kênh không tên #{unnamed}", "other"
+        out.append(Sensor(id=f"hwinfo/{t['key']}", name=name, hardware=f"HWiNFO · {t['device']}",
                           category=cat, value=_round(_plausible(t["value"], cat))))
     return out
 

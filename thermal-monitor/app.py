@@ -29,7 +29,7 @@ import history
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.5.1"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
 FROZEN = getattr(sys, "frozen", False)
@@ -179,6 +179,9 @@ class SettingsStore:
         with self.lock:
             if "picks" in patch:  # picks thay thế toàn bộ (cho phép quay về AUTO)
                 self.data["picks"] = {}
+            elif patch.get("board_source", self.data["board_source"]) != self.data["board_source"]:
+                # Đổi nguồn A/B: bỏ cảm biến mainboard chọn tay, nếu không đồng hồ vẫn bám cảm biến cũ
+                self.data["picks"].pop("board", None)
             _deep_merge(self.data, copy.deepcopy(patch))
             snapshot = copy.deepcopy(self.data)
             if self.path:
