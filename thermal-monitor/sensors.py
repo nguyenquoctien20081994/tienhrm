@@ -1,0 +1,508 @@
+"""Nguồn đọc nhiệt độ phần cứng cho Thermal Core HUD.
+
+Mỗi provider trả về danh sách Sensor. Thứ tự ưu tiên khi chạy chế độ "auto":
+
+* Windows : LibreHardwareMonitor (web server data.json) -> dự phòng nvidia-smi + ACPI (WMI)
+* Linux   : /sys/class/hwmon -> bổ sung nvidia-smi nếu chưa có GPU
+* Demo    : dữ liệu mô phỏng (chỉ khi chạy với --demo)
+
+Không bao giờ tự chuyển sang dữ liệu giả khi không đọc được cảm biến thật.
+"""
+
+from __future__ import annotations
+
+import base64
+import glob
+import json
+import math
+import os
+import random
+import re
+import shutil
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+from dataclasses import asdict, dataclass, field
+
+CATEGORIES = ("cpu", "gpu", "board", "storage", "other")
+
+
+@dataclass
+class Sensor:
+    id: str
+    name: str
+    hardware: str
+    category: str
+    value: float | None
+    min: float | None = None
+    max: float | None = None
+
+
+@dataclass
+class Reading:
+    sensors: list[Sensor]
+    source: str
+    mode: str = "live"  # live | demo | nosensor
+    messages: list[str] = field(default_factory=list)
+
+
+def _round(v: float | None) -> float | None:
+    return None if v is None else round(v, 1)
+
+
+# ---------------------------------------------------------------------------
+# Chọn cảm biến chính cho từng nhóm
+# ---------------------------------------------------------------------------
+
+_PRIMARY_PREFS = {
+    "cpu": ["cpu package", "core (tctl/tdie)", "tctl/tdie", "tdie", "tctl",
+            "package id 0", "package", "core average", "core max", "cpu"],
+    "gpu": ["gpu core", "gpu temperature", "edge", "junction", "gpu hot spot", "core", "gpu"],
+    "board": ["motherboard", "mainboard", "system", "systin", "pch", "chipset",
+              "acpi", "thermal zone", "temperature"],
+}
+
+
+def _is_discrete_gpu(s: Sensor) -> bool:
+    text = f"{s.id} {s.hardware}".lower()
+    return any(k in text for k in ("nvidia", "geforce", "rtx", "gtx", "radeon", "gpu-amd", "amdgpu"))
+
+
+def pick_primary(sensors: list[Sensor]) -> dict[str, str | None]:
+    result: dict[str, str | None] = {}
+    for cat in ("cpu", "gpu", "board"):
+        cands = [s for s in sensors if s.category == cat]
+        if cat == "board" and not cands:
+            # Laptop (vd. ThinkPad) không có chip SuperIO và ACPI có thể bị khoá ->
+            # dùng nhiệt độ SSD NVMe (nằm trên mainboard) làm nguồn thay thế; giao diện ghi rõ "thay thế".
+            cands = [s for s in sensors if s.category == "storage"]
+        if cat == "gpu":
+            # Ưu tiên GPU rời; nếu GPU rời đang ngủ (không có giá trị) thì vẫn giữ nó
+            # để giao diện hiển thị trạng thái SLEEP thay vì nhảy sang GPU khác.
+            discrete = [s for s in cands if _is_discrete_gpu(s)]
+            cands = discrete or cands
+        live = [s for s in cands if s.value is not None]
+        pool = live or cands
+        chosen = None
+        for pref in _PRIMARY_PREFS[cat]:
+            chosen = next((s for s in pool if pref in s.name.lower()), None)
+            if chosen:
+                break
+        if chosen is None and live:
+            chosen = max(live, key=lambda s: s.value)
+        if chosen is None and pool:
+            chosen = pool[0]
+        result[cat] = chosen.id if chosen else None
+    return result
+
+
+# ---------------------------------------------------------------------------
+# LibreHardwareMonitor (Windows) – đọc từ Remote Web Server: http://localhost:8085/data.json
+# ---------------------------------------------------------------------------
+
+_GROUP_NAMES = {"temperatures", "voltages", "clocks", "loads", "fans", "controls", "powers",
+                "data", "smalldata", "throughput", "levels", "factors", "currents",
+                "frequencies", "energy", "noise", "timings", "conductances", "humidity"}
+
+_VALUE_RE = re.compile(r"(-?\d+(?:[.,]\d+)?)\s*°?\s*([CF])\b")
+
+
+def parse_lhm_value(text) -> float | None:
+    """'45.0 °C' / '45,0 °C' / '113.0 °F' -> độ C."""
+    if text is None:
+        return None
+    if isinstance(text, (int, float)):
+        return float(text)
+    m = _VALUE_RE.search(str(text))
+    if not m:
+        return None
+    v = float(m.group(1).replace(",", "."))
+    if m.group(2) == "F":
+        v = (v - 32) * 5 / 9
+    return v
+
+
+_CLASSIFY_RULES = [
+    ("cpu", re.compile(r"intelcpu|amdcpu|^/cpu|cpu\.png")),
+    ("gpu", re.compile(r"^/gpu|nvidia\.png|ati\.png|amd\.png|intel\.png")),
+    ("board", re.compile(r"^/lpc|^/motherboard|^/mainboard|^/ec\b|mainboard\.png|chip\.png")),
+    ("storage", re.compile(r"^/nvme|^/hdd|^/ssd|^/storage|hdd\.png")),
+    # Tên phần cứng (chỉ dùng khi không có HardwareId / icon)
+    ("gpu", re.compile(r"nvidia|geforce|radeon|\bgpu\b|graphics")),
+    ("cpu", re.compile(r"\bcpu\b|ryzen|core\(tm\)|core i\d|core ultra|xeon|celeron|pentium")),
+    ("board", re.compile(r"superio|embedded controller|nct\d|ite it|it8\d|fintek|winbond|acpi|thermal zone|pch|chipset")),
+    ("storage", re.compile(r"nvme|ssd|\bdisk\b|samsung|wdc|kingston")),
+]
+
+
+def _raw_or_text(node: dict, key: str) -> float | None:
+    """LHM >= 0.9.x có RawValue (số, luôn là °C); bản cũ chỉ có chuỗi đã định dạng."""
+    raw = node.get("Raw" + key)
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return float(raw)
+    return parse_lhm_value(node.get(key))
+
+
+def _classify(hints: list[str]) -> str:
+    """Phân loại theo thứ tự quy tắc: ID/icon có cấu trúc trước, tên tự do sau.
+
+    Nhờ vậy "AMD Ryzen 7 5800H with Radeon Graphics" (icon cpu.png) vẫn là CPU.
+    """
+    texts = [h.lower() for h in hints if h]
+    for cat, rx in _CLASSIFY_RULES:
+        if any(rx.search(t) for t in texts):
+            return cat
+    return "other"
+
+
+def parse_lhm_tree(root: dict) -> list[Sensor]:
+    sensors: list[Sensor] = []
+
+    def is_group(node: dict) -> bool:
+        return str(node.get("Text", "")).strip().lower() in _GROUP_NAMES and not node.get("HardwareId")
+
+    def walk(node: dict, hw_path: list[str], hw_hints: list[str], depth: int) -> None:
+        children = node.get("Children") or []
+        if not children:
+            stype = str(node.get("Type", "")).lower()
+            value_text = node.get("Value")
+            is_temp = stype == "temperature" or (stype == "" and _VALUE_RE.search(str(value_text or "")))
+            if not is_temp:
+                return
+            name = str(node.get("Text", "?"))
+            if "distance to tjmax" in name.lower():  # là khoảng cách tới ngưỡng, không phải nhiệt độ
+                return
+            hardware = " / ".join(hw_path) or "Unknown"
+            sid = node.get("SensorId") or f"lhm:{hardware}/{name}"
+            category = _classify([str(node.get("SensorId", ""))] + [h for hw in hw_hints for h in hw])
+            if category == "other" and name.lower().startswith(("cpu", "core")):
+                category = "cpu"
+            sensors.append(Sensor(
+                id=str(sid), name=name, hardware=hardware, category=category,
+                value=_round(_raw_or_text(node, "Value")),
+                min=_round(_raw_or_text(node, "Min")),
+                max=_round(_raw_or_text(node, "Max")),
+            ))
+            return
+        path, hints = hw_path, hw_hints
+        # depth 0 = "Sensor" (gốc), depth 1 = tên máy tính -> không đưa vào đường dẫn phần cứng
+        if depth >= 2 and not is_group(node):
+            path = hw_path + [str(node.get("Text", "?"))]
+            hints = hw_hints + [(str(node.get("HardwareId", "")), str(node.get("ImageURL", "")),
+                                 str(node.get("Text", "")))]
+        for child in children:
+            walk(child, path, hints, depth + 1)
+
+    walk(root, [], [], 0)
+    return sensors
+
+
+class LhmHttpProvider:
+    name = "LibreHardwareMonitor"
+
+    def __init__(self, url: str = "http://localhost:8085/data.json", auth: str | None = None, timeout: float = 1.5):
+        self.url = url
+        self.timeout = timeout
+        self.headers = {"Accept": "application/json"}
+        if auth:
+            self.headers["Authorization"] = "Basic " + base64.b64encode(auth.encode()).decode()
+
+    def read(self) -> list[Sensor]:
+        req = urllib.request.Request(self.url, headers=self.headers)
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8-sig"))
+        return parse_lhm_tree(data)
+
+
+# ---------------------------------------------------------------------------
+# Bộ nhớ đệm chạy nền cho các lệnh chậm (nvidia-smi, PowerShell)
+# ---------------------------------------------------------------------------
+
+class _BackgroundPoller:
+    def __init__(self, fn, interval: float):
+        self._fn = fn
+        self._interval = interval
+        self._lock = threading.Lock()
+        self._value: list[Sensor] = []
+        self.error: str | None = None
+        self._started = False
+
+    def get(self) -> list[Sensor]:
+        if not self._started:
+            self._started = True
+            self._tick()  # lần đầu chạy đồng bộ để có dữ liệu ngay
+            threading.Thread(target=self._loop, daemon=True).start()
+        with self._lock:
+            return list(self._value)
+
+    def _tick(self) -> None:
+        try:
+            value, self.error = self._fn(), None
+        except Exception as exc:  # noqa: BLE001 - lỗi nguồn phụ không được làm sập app
+            value, self.error = [], str(exc)
+        with self._lock:
+            self._value = value
+
+    def _loop(self) -> None:
+        while True:
+            time.sleep(self._interval)
+            self._tick()
+
+
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def _run(cmd: list[str], timeout: float) -> str:
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, creationflags=_NO_WINDOW)
+    if out.returncode != 0:
+        raise RuntimeError((out.stderr or out.stdout).strip() or f"{cmd[0]} exit {out.returncode}")
+    return out.stdout
+
+
+def parse_nvidia_smi(text: str) -> list[Sensor]:
+    sensors = []
+    for line in text.strip().splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) < 3:
+            continue
+        idx, name, temp = parts[0], parts[1], parts[2]
+        try:
+            value = float(temp)
+        except ValueError:
+            value = None  # "[N/A]" khi GPU đang ngủ
+        sensors.append(Sensor(id=f"nvsmi/{idx}", name="GPU Core", hardware=name, category="gpu", value=value))
+    return sensors
+
+
+class NvidiaSmiProvider:
+    name = "nvidia-smi"
+
+    def __init__(self, interval: float = 2.0):
+        self.exe = shutil.which("nvidia-smi")
+        self._poller = _BackgroundPoller(self._query, interval)
+
+    @property
+    def available(self) -> bool:
+        return self.exe is not None
+
+    def _query(self) -> list[Sensor]:
+        out = _run([self.exe, "--query-gpu=index,name,temperature.gpu", "--format=csv,noheader,nounits"], 4)
+        return parse_nvidia_smi(out)
+
+    def read(self) -> list[Sensor]:
+        return self._poller.get() if self.exe else []
+
+
+class WindowsAcpiProvider:
+    """Nhiệt độ vùng nhiệt ACPI qua WMI. Cần quyền Administrator, nhiều laptop không hỗ trợ."""
+
+    name = "ACPI (WMI)"
+    _PS = ("Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction Stop | "
+           "ForEach-Object { \"$($_.InstanceName)|$($_.CurrentTemperature)\" }")
+
+    def __init__(self, interval: float = 5.0):
+        self._poller = _BackgroundPoller(self._query, interval)
+
+    def _query(self) -> list[Sensor]:
+        out = _run(["powershell", "-NoProfile", "-NonInteractive", "-Command", self._PS], 8)
+        sensors = []
+        for i, line in enumerate(l for l in out.splitlines() if "|" in l):
+            inst, raw = line.rsplit("|", 1)
+            try:
+                value = float(raw) / 10 - 273.15  # đơn vị gốc: 1/10 độ Kelvin
+            except ValueError:
+                continue
+            if not -20 < value < 150:
+                continue
+            zone = re.search(r"ThermalZone\\([^\\_]+)", inst)
+            sensors.append(Sensor(id=f"acpi/{i}", name=f"ACPI {zone.group(1) if zone else i}",
+                                  hardware=f"Embedded Controller · {inst.strip() or 'ACPI'}",
+                                  category="board", value=_round(value)))
+        return sensors
+
+    @property
+    def error(self) -> str | None:
+        return self._poller.error
+
+    def read(self) -> list[Sensor]:
+        return self._poller.get()
+
+
+# ---------------------------------------------------------------------------
+# Linux – /sys/class/hwmon
+# ---------------------------------------------------------------------------
+
+_HWMON_CAT = [
+    (re.compile(r"^(coretemp|k10temp|zenpower|cpu_thermal|x86_pkg_temp|soc_thermal)"), "cpu"),
+    (re.compile(r"^(amdgpu|radeon|nouveau|i915|xe)$"), "gpu"),
+    (re.compile(r"^(nvme|drivetemp)"), "storage"),
+    (re.compile(r"^(acpitz|pch_|nct|it8|asus|thinkpad|dell_smm|hp|f71|w83|applesmc|gigabyte|sch5)"), "board"),
+]
+
+
+def _read_text(path: str) -> str | None:
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+class LinuxHwmonProvider:
+    name = "Linux hwmon"
+
+    def __init__(self, root: str = "/sys/class/hwmon"):
+        self.root = root
+
+    def read(self) -> list[Sensor]:
+        sensors = []
+        for hw in sorted(glob.glob(os.path.join(self.root, "hwmon*"))):
+            chip = _read_text(os.path.join(hw, "name")) or os.path.basename(hw)
+            category = next((cat for rx, cat in _HWMON_CAT if rx.search(chip)), "other")
+            for inp in sorted(glob.glob(os.path.join(hw, "temp*_input"))):
+                raw = _read_text(inp)
+                if raw is None:
+                    continue
+                try:
+                    value = int(raw) / 1000
+                except ValueError:
+                    continue
+                base = inp[: -len("_input")]
+                label = _read_text(base + "_label") or os.path.basename(base)
+                sensors.append(Sensor(id=f"hwmon/{os.path.basename(hw)}/{os.path.basename(base)}",
+                                      name=label, hardware=chip, category=category, value=_round(value)))
+        return sensors
+
+
+# ---------------------------------------------------------------------------
+# Demo – mô phỏng có tải tăng/giảm, chỉ dùng khi chạy --demo
+# ---------------------------------------------------------------------------
+
+class DemoProvider:
+    name = "Demo simulator"
+
+    def __init__(self):
+        self.t0 = time.time()
+        self.state = {"cpu": 48.0, "gpu": 44.0, "board": 41.0, "nvme": 38.0}
+
+    def read(self) -> list[Sensor]:
+        t = time.time() - self.t0
+        load = 0.5 + 0.5 * math.sin(t / 17) * math.sin(t / 5.3)  # 0..1, có các đợt tải
+        targets = {"cpu": 42 + 52 * load, "gpu": 40 + 40 * max(0.0, math.sin(t / 23)),
+                   "board": 38 + 12 * load, "nvme": 36 + 8 * load}
+        speed = {"cpu": 0.35, "gpu": 0.15, "board": 0.05, "nvme": 0.05}
+        for k, target in targets.items():
+            self.state[k] += (target - self.state[k]) * speed[k] + random.uniform(-0.6, 0.6)
+        cpu = self.state["cpu"]
+        sensors = [
+            Sensor("demo/cpu/package", "CPU Package", "Intel Core i7-12700H (demo)", "cpu", _round(cpu)),
+            *[Sensor(f"demo/cpu/core{i}", f"CPU Core #{i + 1}", "Intel Core i7-12700H (demo)", "cpu",
+                     _round(cpu - 3 + random.uniform(-2, 2))) for i in range(4)],
+            Sensor("demo/gpu/core", "GPU Core", "NVIDIA GeForce RTX 3060 Laptop (demo)", "gpu", _round(self.state["gpu"])),
+            Sensor("demo/gpu/hotspot", "GPU Hot Spot", "NVIDIA GeForce RTX 3060 Laptop (demo)", "gpu",
+                   _round(self.state["gpu"] + 9)),
+            Sensor("demo/board/sys", "Motherboard", "Embedded Controller (demo)", "board", _round(self.state["board"])),
+            Sensor("demo/board/pch", "PCH", "Embedded Controller (demo)", "board", _round(self.state["board"] + 6)),
+            Sensor("demo/nvme", "Composite", "Samsung SSD 980 1TB (demo)", "storage", _round(self.state["nvme"])),
+        ]
+        return sensors
+
+
+# ---------------------------------------------------------------------------
+# Bộ tổng hợp
+# ---------------------------------------------------------------------------
+
+class AutoProvider:
+    def __init__(self, lhm_url: str | None, lhm_auth: str | None = None):
+        is_windows = sys.platform.startswith("win")
+        self.lhm = LhmHttpProvider(lhm_url, lhm_auth) if lhm_url else None
+        self.hwmon = LinuxHwmonProvider() if sys.platform.startswith("linux") else None
+        self.nvsmi = NvidiaSmiProvider()
+        self.acpi = WindowsAcpiProvider() if is_windows else None
+
+    def read(self) -> Reading:
+        sensors: list[Sensor] = []
+        sources: list[str] = []
+        messages: list[str] = []
+
+        if self.lhm:
+            try:
+                got = self.lhm.read()
+                sensors += got
+                sources.append(self.lhm.name)
+                if not got:
+                    messages.append("LibreHardwareMonitor đang chạy nhưng không trả về cảm biến nhiệt độ nào.")
+            except (urllib.error.URLError, OSError, ValueError) as exc:
+                messages.append(f"Không kết nối được LibreHardwareMonitor ({self.lhm.url}): {exc}. "
+                                "Mở LibreHardwareMonitor bằng quyền Administrator và bật "
+                                "Options → Remote Web Server → Run.")
+
+        if self.hwmon:
+            got = self.hwmon.read()
+            if got:
+                sensors += got
+                sources.append(self.hwmon.name)
+
+        has_gpu = any(s.category == "gpu" and s.value is not None for s in sensors)
+        if not has_gpu and self.nvsmi.available:
+            got = self.nvsmi.read()
+            if got:
+                sensors += got
+                sources.append(self.nvsmi.name)
+
+        # Laptop thường không có chip SuperIO -> thử vùng nhiệt ACPI làm nhiệt độ "mainboard".
+        if self.acpi and not any(s.category == "board" for s in sensors):
+            got = self.acpi.read()
+            if got:
+                sensors += got
+                sources.append(self.acpi.name)
+            elif self.acpi.error and not any(s.category == "storage" for s in sensors):
+                # Có SSD làm nguồn thay thế thì không cần cảnh báo
+                messages.append("Không có cảm biến mainboard; ACPI/WMI cũng không đọc được "
+                                "(cần chạy app bằng quyền Administrator, hoặc máy không hỗ trợ).")
+
+        mode = "live" if sensors else "nosensor"
+        if not sensors:
+            messages.append("Chưa đọc được cảm biến nhiệt độ nào trên máy này.")
+        return Reading(sensors=sensors, source=" + ".join(sources) or "—", mode=mode, messages=messages)
+
+
+class DemoAuto:
+    def __init__(self):
+        self.p = DemoProvider()
+
+    def read(self) -> Reading:
+        return Reading(sensors=self.p.read(), source=self.p.name, mode="demo",
+                       messages=["Đang chạy chế độ DEMO – số liệu mô phỏng, không phải nhiệt độ thật."])
+
+
+def add_igpu_estimate(sensors: list[Sensor]) -> list[Sensor]:
+    """Intel iGPU (UHD/Iris Xe) không có cảm biến nhiệt riêng: nó nằm chung đế (die) với CPU,
+    nên nhiệt độ CPU Package là thước đo sát nhất. Chỉ thêm khi máy hoàn toàn không có cảm biến GPU."""
+    if any(s.category == "gpu" for s in sensors):
+        return sensors
+    pkg = next((s for s in sensors if s.category == "cpu" and s.name.lower() in ("cpu package", "package id 0")), None)
+    if pkg is None:
+        return sensors
+    ident = f"{pkg.id} {pkg.hardware}".lower()
+    if "intel" not in ident and "coretemp" not in ident:
+        return sensors
+    return sensors + [Sensor(id="derived/igpu", name="iGPU ≈ CPU Package", category="gpu",
+                             hardware=f"Intel iGPU – chung đế với {pkg.hardware} (ước tính)",
+                             value=pkg.value, min=pkg.min, max=pkg.max)]
+
+
+def snapshot(reading: Reading) -> dict:
+    if reading.mode == "live":
+        reading.sensors = add_igpu_estimate(reading.sensors)
+    return {
+        "ts": time.time(),
+        "source": reading.source,
+        "mode": reading.mode,
+        "messages": reading.messages,
+        "sensors": [asdict(s) for s in reading.sensors],
+        "primary": pick_primary(reading.sensors),
+    }

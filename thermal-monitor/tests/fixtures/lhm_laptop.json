@@ -1,0 +1,21 @@
+{"id":0,"Text":"Sensor","Min":"Min","Value":"Value","Max":"Max","ImageURL":"","Children":[
+ {"id":1,"Text":"LAPTOP-TIEN","Min":"","Value":"","Max":"","ImageURL":"images_icon/computer.png","Children":[
+  {"id":2,"Text":"ASUSTeK TUF Gaming FX506HM","Min":"","Value":"","Max":"","ImageURL":"images_icon/mainboard.png","HardwareId":"/motherboard","Children":[]},
+  {"id":3,"Text":"12th Gen Intel Core i7-12700H","Min":"","Value":"","Max":"","ImageURL":"images_icon/cpu.png","HardwareId":"/intelcpu/0","Children":[
+   {"id":4,"Text":"Temperatures","Min":"","Value":"","Max":"","ImageURL":"images_icon/temperature.png","Children":[
+    {"id":5,"Text":"CPU Core #1","Min":"45,0 °C","Value":"62,0 °C","Max":"88,0 °C","SensorId":"/intelcpu/0/temperature/0","Type":"Temperature","ImageURL":"images/transparent.png","Children":[]},
+    {"id":6,"Text":"CPU Package","Min":"47,0 °C","Value":"71,0 °C","Max":"93,0 °C","SensorId":"/intelcpu/0/temperature/14","Type":"Temperature","ImageURL":"images/transparent.png","Children":[]},
+    {"id":7,"Text":"Core Max","Min":"47,0 °C","Value":"72,0 °C","Max":"93,0 °C","SensorId":"/intelcpu/0/temperature/15","Type":"Temperature","ImageURL":"images/transparent.png","Children":[]}]},
+   {"id":8,"Text":"Load","Min":"","Value":"","Max":"","ImageURL":"images_icon/load.png","Children":[
+    {"id":9,"Text":"CPU Total","Min":"1,0 %","Value":"35,2 %","Max":"100,0 %","SensorId":"/intelcpu/0/load/0","Type":"Load","ImageURL":"images/transparent.png","Children":[]}]}]},
+  {"id":10,"Text":"Intel(R) Iris(R) Xe Graphics","Min":"","Value":"","Max":"","ImageURL":"images_icon/intel.png","HardwareId":"/gpu-intel-integrated/0","Children":[
+   {"id":11,"Text":"Load","Min":"","Value":"","Max":"","ImageURL":"images_icon/load.png","Children":[
+    {"id":12,"Text":"D3D 3D","Min":"0,0 %","Value":"3,0 %","Max":"40,0 %","SensorId":"/gpu-intel-integrated/0/load/0","Type":"Load","ImageURL":"images/transparent.png","Children":[]}]}]},
+  {"id":13,"Text":"NVIDIA GeForce RTX 3060 Laptop GPU","Min":"","Value":"","Max":"","ImageURL":"images_icon/nvidia.png","HardwareId":"/gpu-nvidia/0","Children":[
+   {"id":14,"Text":"Temperatures","Min":"","Value":"","Max":"","ImageURL":"images_icon/temperature.png","Children":[
+    {"id":15,"Text":"GPU Hot Spot","Min":"50,0 °C","Value":"66,3 °C","Max":"80,0 °C","SensorId":"/gpu-nvidia/0/temperature/2","Type":"Temperature","ImageURL":"images/transparent.png","Children":[]},
+    {"id":16,"Text":"GPU Core","Min":"44,0 °C","Value":"57,0 °C","Max":"72,0 °C","SensorId":"/gpu-nvidia/0/temperature/0","Type":"Temperature","ImageURL":"images/transparent.png","Children":[]}]}]},
+  {"id":17,"Text":"Samsung SSD 980 1TB","Min":"","Value":"","Max":"","ImageURL":"images_icon/hdd.png","HardwareId":"/nvme/0","Children":[
+   {"id":18,"Text":"Temperatures","Min":"","Value":"","Max":"","ImageURL":"images_icon/temperature.png","Children":[
+    {"id":19,"Text":"Composite Temperature","Min":"35,0 °C","Value":"41,0 °C","Max":"52,0 °C","SensorId":"/nvme/0/temperature/0","Type":"Temperature","ImageURL":"images/transparent.png","Children":[]}]}]}
+ ]}]}

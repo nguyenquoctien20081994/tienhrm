@@ -1,0 +1,18 @@
+{"id":0,"Text":"Sensor","Min":"Min","Value":"Value","Max":"Max","ImageURL":"","Children":[
+ {"id":1,"Text":"DESKTOP","Min":"","Value":"","Max":"","ImageURL":"images_icon/computer.png","Children":[
+  {"id":2,"Text":"MSI MAG B550 TOMAHAWK","Min":"","Value":"","Max":"","ImageURL":"images_icon/mainboard.png","Children":[
+   {"id":3,"Text":"Nuvoton NCT6797D","Min":"","Value":"","Max":"","ImageURL":"images_icon/chip.png","Children":[
+    {"id":4,"Text":"Temperatures","Min":"","Value":"","Max":"","ImageURL":"images_icon/temperature.png","Children":[
+     {"id":5,"Text":"CPU Core","Min":"30.5 °C","Value":"48.5 °C","Max":"70.0 °C","ImageURL":"images/transparent.png","Children":[]},
+     {"id":6,"Text":"Motherboard","Min":"30.0 °C","Value":"36.0 °C","Max":"40.0 °C","ImageURL":"images/transparent.png","Children":[]},
+     {"id":7,"Text":"Temperature #3","Min":"","Value":"104.0 °F","Max":"","ImageURL":"images/transparent.png","Children":[]}]},
+    {"id":8,"Text":"Fans","Min":"","Value":"","Max":"","ImageURL":"images_icon/fan.png","Children":[
+     {"id":9,"Text":"Fan #1","Min":"0 RPM","Value":"850 RPM","Max":"1200 RPM","ImageURL":"images/transparent.png","Children":[]}]}]}]},
+  {"id":10,"Text":"AMD Ryzen 7 5800X","Min":"","Value":"","Max":"","ImageURL":"images_icon/cpu.png","Children":[
+   {"id":11,"Text":"Temperatures","Min":"","Value":"","Max":"","ImageURL":"images_icon/temperature.png","Children":[
+    {"id":12,"Text":"Core (Tctl/Tdie)","Min":"35.0 °C","Value":"55.3 °C","Max":"81.0 °C","ImageURL":"images/transparent.png","Children":[]},
+    {"id":13,"Text":"CCD1 (Tdie)","Min":"33.0 °C","Value":"52.0 °C","Max":"79.0 °C","ImageURL":"images/transparent.png","Children":[]}]}]},
+  {"id":14,"Text":"AMD Radeon RX 6700 XT","Min":"","Value":"","Max":"","ImageURL":"images_icon/ati.png","Children":[
+   {"id":15,"Text":"Temperatures","Min":"","Value":"","Max":"","ImageURL":"images_icon/temperature.png","Children":[
+    {"id":16,"Text":"GPU Core","Min":"38.0 °C","Value":"45.0 °C","Max":"60.0 °C","ImageURL":"images/transparent.png","Children":[]}]}]}
+ ]}]}
