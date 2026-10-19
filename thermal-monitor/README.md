@@ -61,20 +61,21 @@ Kết luận "tản nhiệt tốt/kém" chỉ đưa ra khi có số liệu tải
 - Nút **HUD / COCKPIT**: HUD là đồng hồ cơ tròn; COCKPIT là thanh đo dọc kiểu buồng lái máy bay, có con trỏ, dải vùng nhiệt và số đọc lớn.
 - Nút **◐ AUTO / ☾ ĐÊM / ☀ NGÀY**: AUTO tự đổi theo giờ (6:00–18:00 là ngày). Mặt đồng hồ luôn giữ nền tối như đồng hồ thật.
 
-### Giao diện Việt Tâm (nổi khối 3D, có nhân vật)
-- Nút **VIỆT TÂM** trên thanh điều khiển chuyển sang giao diện của Công ty TNHH Thiết Bị Việt Tâm (về lại: menu trái →
-  *Công cụ nhanh* → **Giao diện Thermal Core**). Giao diện theo mẫu trang chủ nội bộ của công ty: nền sáng, thẻ trắng bo góc
-  nổi khối, nút dạng viên thuốc bóng, chữ tiêu đề Oswald, ngày tháng và khẩu hiệu "Cùng nhau phát triển" viết tay.
-- **Menu trái**: Tổng quan, Nhân CPU, Sức khoẻ ổ cứng, Nhật ký nhiệt độ, Tất cả cảm biến, Cài đặt cảnh báo (bấm để cuộn tới mục,
-  mục đang xem được tô sáng) và *Công cụ nhanh* (đồng hồ nổi, đổi °C/°F, xuất file chẩn đoán).
-- **Thanh trên**: chuông = còi cảnh báo quá nhiệt (vàng khi bật, số đỏ = số đồng hồ đang vượt ngưỡng), công tắc ngày/đêm
-  (bấm để đổi Tự động → Đêm → Ngày), tên máy và tên CPU.
-- **Thẻ chào**: nhân viên nam đổi tư thế theo nhiệt độ, nhận định tình trạng máy, điểm nhiệt. **Thanh lời khuyên**: nhân viên nữ
-  nhắc việc nên làm, nút bật đồng hồ nổi và lối tắt tới cài đặt cảnh báo.
-- **Đồng hồ đo kiểu mới**: đĩa nổi khối có mặt kính phản quang; vòng đo bóng màu **xanh = ổn định**, **cam = cao**,
-  **đỏ = quá nhiệt** (vành đỏ nhấp nháy); núm 3D ở đầu vòng đo; vạch vùng cảnh báo cam/đỏ phía ngoài; chấm xanh/cam là nhiệt độ
-  thấp nhất/cao nhất từ lúc mở app; số đo lớn ở tâm kèm xu hướng °C/phút.
-- Có chế độ đêm riêng (xanh đen, vẫn nổi khối). Font được đóng gói sẵn nên chạy không cần Internet.
+### Giao diện Việt Tâm (nổi khối 3D, tối giản)
+Thiết kế theo mẫu trang chủ nội bộ của công ty, sắp xếp theo thứ tự người xem cần:
+
+1. **Thẻ trạng thái** – trả lời "máy có ổn không?" trong 1 cái nhìn: 1 tiêu đề (vd. *Máy hoạt động bình thường*),
+   1 dòng số liệu (*Cao nhất: CPU 69°C, còn 16°C tới ngưỡng cảnh báo*), 1 lời khuyên, điểm nhiệt, và 2 nhân viên Việt Tâm.
+2. **3 đồng hồ** – CPU, Card đồ hoạ, Mainboard: số đo lớn, vòng đo **xanh = ổn định**, **cam = cao**, **đỏ = quá nhiệt**;
+   bên dưới là Thấp nhất / Trung bình / Cao nhất và tên phần cứng.
+3. **Tab Chi tiết** (nhiệt từng nhân CPU, sức khoẻ ổ cứng, tất cả cảm biến) và **tab Nhật ký** (biểu đồ 1 giờ – 30 ngày)
+   – chỉ mở khi cần, không chiếm màn hình chính.
+
+Thanh trên chỉ có logo (kèm chấm trạng thái: xanh = đang đo, cam = dữ liệu mô phỏng, đỏ = mất tín hiệu), 3 tab và 3 nút:
+**đồng hồ nổi góc màn hình**, **công tắc ngày/đêm**, **cài đặt**. Các tuỳ chọn ít dùng nằm trong **Cài đặt**: giao diện
+(Việt Tâm / Thermal Core), chế độ màu (tự động/ngày/đêm), °C/°F, còi báo quá nhiệt, chu kỳ đo, nguồn mainboard A/B,
+cảm biến cho từng đồng hồ, ngưỡng cảnh báo, ảnh nhân vật & logo. Trang Tổng quan vừa trọn 1 màn hình từ 1280×720 trở lên.
+
 - Nhân vật đổi tư thế theo mức nhiệt (ảnh trong `web/img/vt/<nam|nu>-<mức>.webp`):
 
   | Mức nhiệt | Nam | Nữ |
@@ -86,9 +87,9 @@ Kết luận "tản nhiệt tốt/kém" chỉ đưa ra khi có số liệu tải
   | Nóng | Gọi điện | Chỉ tay, cầm sổ |
   | Quá nhiệt | Chỉ tay khẩn cấp | Gọi điện báo IT/HCNS |
 
-  Khi có lời khuyên cụ thể (vd. ổ cứng cần sao lưu), nhân vật nữ nói lời khuyên đó.
-- Màu riêng của 3 đồng hồ (CPU xanh ngọc, GPU hồng, MAINBOARD lục) giữ nguyên ở cả 2 giao diện.
-- **Thay ảnh khác** (không bắt buộc): **CALIBRATE** → *Ảnh cho giao diện Việt Tâm* → **CHỌN ẢNH** cho *Nhân vật nam*, *Nhân vật nữ*,
+  Khi có lời khuyên cụ thể (vd. ổ cứng cần sao lưu), thẻ trạng thái hiện đúng lời khuyên đó.
+- Chấm màu cạnh tên đồng hồ giữ màu nhận diện (CPU xanh ngọc, GPU hồng, Mainboard lục) giống biểu đồ nhật ký.
+- **Thay ảnh khác** (không bắt buộc): **Cài đặt** → *Ảnh nhân vật & logo* → **CHỌN ẢNH** cho *Nhân vật nam*, *Nhân vật nữ*,
   *Logo công ty*. Ảnh thay thế dùng chung cho mọi mức nhiệt, được thu nhỏ còn tối đa 640 px và lưu trong
   `%LOCALAPPDATA%\ThermalCoreHUD\brand\` (không gửi ra ngoài). Chỉ nhận PNG/JPG/GIF/WebP (không nhận SVG vì lý do bảo mật).
   Bấm **XOÁ** để quay về ảnh có sẵn.

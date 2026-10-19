@@ -28,7 +28,7 @@
     historyDays: 30,
     boardSource: "auto",
     ui: { style: "hud", theme: "auto", brand: "thermal", ...store.get("ui", {}) },
-    sound: false,
+    sound: store.get("sound", false),  // còi báo quá nhiệt (nhớ trên máy này)
     thresholds: store.get("thresholds", {}),
     picks: store.get("picks", {}),
   };
@@ -472,8 +472,8 @@
       x.fillText(g.stale ? "MẤT TÍN HIỆU" : g.sensor ? "ĐANG NGỦ" : "KHÔNG CÓ CẢM BIẾN", 0, R * 0.19);
     }
 
-    // Nhãn trạng thái ở khe dưới vòng đo
-    if (live) {
+    // Nhãn trạng thái ở khe dưới vòng đo (bỏ khi đồng hồ quá nhỏ để không đè lên số)
+    if (live && R / g.dpr >= 80) {
       const label = GLOSS_STATE[lvl], w = R * 0.6, h = R * 0.15, y = R * 0.66;
       x.save();
       x.shadowColor = hexA(c1, 0.4); x.shadowBlur = R * 0.04; x.shadowOffsetY = R * 0.015;
@@ -869,7 +869,7 @@
     updateHeader(snap);
     renderVerdict(snap.assessment);
     renderVt(snap.assessment);
-    if (isVt()) updateVtMachine(snap);
+    if (isVt()) updateVtBar(snap);
     if (snap.version) $("#footVersion").textContent = `THERMAL CORE HUD v${snap.version}`;
     renderTele(snap);
     updateSourceSwitch(snap.metrics?.board_source);
@@ -935,7 +935,7 @@
       document.dispatchEvent(new CustomEvent("tch:theme", { detail: theme }));
       if (!first && isVt()) gauges.forEach(buildLayers);  // mặt đồng hồ Việt Tâm đổi màu theo ngày/đêm
     }
-    if (isVt()) updateVtTop();
+    if (isVt()) updateVtBar();
     $("#btnTheme").textContent = { auto: "◐ AUTO", day: "☀ NGÀY", night: "☾ ĐÊM" }[mode];
   }
   function updateStyleButton() {
@@ -969,84 +969,98 @@
     unknown: ["Đang đọc cảm biến…", "Chờ mình một chút nha!"],
   };
   const CREW_LEVELS = Object.keys(CREW_LINES);
-  const VT_CHIP = { cool: "RẤT MÁT", normal: "BÌNH THƯỜNG", warm: "HƠI ẤM", hot: "NÓNG", critical: "QUÁ NHIỆT", unknown: "ĐANG ĐỌC" };
+  // Tiêu đề ngắn, đọc là hiểu ngay
+  const VT_TITLE = {
+    cool: "Máy đang rất mát", normal: "Máy hoạt động bình thường", warm: "Máy hơi ấm – vẫn an toàn",
+    hot: "Máy đang nóng – nên giảm tải", critical: "Quá nhiệt – cần xử lý ngay", unknown: "Đang đọc cảm biến…",
+  };
   // Màu mức nhiệt trên nền sáng của giao diện Việt Tâm (đậm hơn bản neon để đủ tương phản)
   const VT_LEVEL = { cool: "#1f8fd6", normal: "#1e9a59", warm: "#d98a00", hot: "#e0621b", critical: "#d7262d", unknown: "#7486a3" };
+  const VT_GAUGE = { cpu: "CPU", gpu: "Card đồ hoạ", board: "Mainboard" };
+  const VT_STATS = ["Thấp nhất", "Trung bình", "Cao nhất"];
   let brandHave = {};  // ảnh người dùng tự tải lên (thay cho ảnh có sẵn)
   let crewPreloaded = false;
+  let vtHost = "";
   const isVt = () => settings.ui.brand === "viettam";
   const poseSrc = (slot, level) => (brandHave[slot] ? `api/brand/${slot}?v=${brandStamp}` : `img/vt/${slot}-${level}.webp`);
   function setSrc(img, src) { if (img.getAttribute("src") !== src) img.setAttribute("src", src); }
 
-  // Thẻ chào + thanh lời khuyên: nhân vật đổi tư thế, nhận định nhiệt độ, điểm nhiệt
+  // Thẻ trạng thái: 1 tiêu đề, 1 dòng số liệu, 1 lời khuyên, điểm nhiệt; nhân vật đổi tư thế theo mức nhiệt
   function renderVt(a) {
     if (!isVt()) return;
     const level = a?.level || "unknown";
-    const lv = VT_LEVEL[level] || VT_LEVEL.unknown;
-    const hello = $("#vtHello");
-    hello.dataset.level = level;
-    hello.style.setProperty("--lv", lv);
+    const hero = $("#vtHero");
+    hero.dataset.level = level;
+    hero.style.setProperty("--lv", VT_LEVEL[level] || VT_LEVEL.unknown);
     setSrc($("#vtNam"), poseSrc("nam", level));
     setSrc($("#vtNu"), poseSrc("nu", level));
-    const [nam, nu] = CREW_LINES[level] || CREW_LINES.unknown;
-    $("#vtChip").textContent = VT_CHIP[level] || VT_CHIP.unknown;
-    $("#vtTitle").textContent = a ? `Chào bạn! ${a.headline}` : "Chào bạn! Đang đọc cảm biến…";
-    $("#vtSay").textContent = nam;
-    $("#vtDetail").textContent = a?.detail || "";
-    $("#vtTips").innerHTML = (a?.tips || []).slice(1).map((t) => `<li>${esc(t)}</li>`).join("");
-    // Có lời khuyên cụ thể (vd. ổ cứng sắp hỏng) thì nhân vật nữ nhắc lời khuyên đó
-    $("#vtTipText").textContent = (a?.tips && a.tips[0]) || nu;
+    $("#vtTitle").textContent = VT_TITLE[level] || VT_TITLE.unknown;
+    // Câu đầu của nhận định: "Cao nhất: CPU 69°C, còn 16°C tới ngưỡng cảnh báo"
+    $("#vtLine").textContent = a?.detail ? a.detail.split(". ")[0].replace(/\.$/, "") : "";
+    $("#vtTipText").textContent = (a?.tips && a.tips[0]) || (CREW_LINES[level] || CREW_LINES.unknown)[1];
     $("#vtScore").textContent = a?.score ?? "--";
     const ring = $("#vtRing"), len = 2 * Math.PI * 50;
     ring.style.strokeDasharray = `${len}`;
     ring.style.strokeDashoffset = `${len * (1 - (a?.score ?? 0) / 100)}`;
-    const hot = gauges.filter((g) => g.level === "warn" || g.level === "crit").length;
-    const badge = $("#vtBell em");
-    badge.hidden = !hot;
-    badge.textContent = hot;
   }
 
   function applyBrand() {
     const vt = isVt();
-    const was = document.documentElement.dataset.brand;
-    document.documentElement.dataset.brand = vt ? "viettam" : "thermal";
+    const root = document.documentElement, was = root.dataset.brand;
+    root.dataset.brand = vt ? "viettam" : "thermal";
+    if (!root.dataset.tab) setTab(store.get("tab", "overview"));
     document.title = vt ? "Việt Tâm · Giám sát nhiệt độ" : "Thermal Core HUD";
     $("#btnBrand").textContent = vt ? "THERMAL" : "VIỆT TÂM";
     $("#btnBrand").title = vt ? "Về giao diện Thermal Core gốc" : "Đổi sang giao diện Việt Tâm";
     $("#favicon").href = vt ? "img/vt/logo.png" : FAVICON_THERMAL;
+    for (const el of document.querySelectorAll("[data-vt]")) {  // tiêu đề tiếng Việt cho giao diện Việt Tâm
+      el.dataset.orig ??= el.innerHTML;
+      if (vt) el.textContent = el.dataset.vt; else el.innerHTML = el.dataset.orig;
+    }
+    for (const g of gauges) {
+      $("h2", g.el).textContent = vt ? VT_GAUGE[g.cfg.key] : g.cfg.title;
+      [...g.el.querySelectorAll(".stats label")].slice(0, 3).forEach((l, i) => { l.textContent = vt ? VT_STATS[i] : ["MIN", "AVG", "MAX"][i]; });
+      // Ô chọn cảm biến: giao diện Việt Tâm đưa vào Cài đặt cho gọn
+      if (vt) $(`[data-pick-slot="${g.cfg.key}"]`).appendChild(g.pick); else $(".card-head", g.el).appendChild(g.pick);
+    }
     if (vt && !crewPreloaded) {  // tải trước mọi tư thế để đổi hình không bị chớp
       crewPreloaded = true;
       for (const slot of ["nam", "nu"]) for (const lv of CREW_LEVELS) new Image().src = `img/vt/${slot}-${lv}.webp`;
     }
     if (vt) {
-      loadBrandImages(); renderVt(state.snap?.assessment); updateVtTop();
+      loadBrandImages(); renderVt(state.snap?.assessment); updateVtBar();
       Promise.all([document.fonts?.load(`600 20px ${FONT_VT_NUM}`), document.fonts?.load(`800 20px ${FONT_VT}`)])
         .then(() => gauges.forEach(buildLayers)).catch(() => { /* dùng font dự phòng */ });
     }
-    if (was && was !== document.documentElement.dataset.brand) {
+    if (was && was !== root.dataset.brand) {
       // Đồng hồ và biểu đồ vẽ bằng canvas: vẽ lại theo bộ màu mới
       gauges.forEach(buildLayers);
-      document.dispatchEvent(new CustomEvent("tch:theme", { detail: document.documentElement.dataset.theme }));
+      document.dispatchEvent(new CustomEvent("tch:theme", { detail: root.dataset.theme }));
     }
   }
-  // Thanh trên của giao diện Việt Tâm: chuông còi cảnh báo, công tắc ngày/đêm
-  function updateVtTop() {
-    const bell = $("#vtBell");
-    bell.classList.toggle("on", settings.sound);
-    bell.title = settings.sound ? "Còi cảnh báo quá nhiệt: đang BẬT (bấm để tắt)" : "Còi cảnh báo quá nhiệt: đang tắt (bấm để bật)";
+  // Tab Tổng quan / Chi tiết / Nhật ký (chỉ giao diện Việt Tâm; giao diện gốc hiện tất cả)
+  function setTab(tab) {
+    document.documentElement.dataset.tab = tab;
+    store.set("tab", tab);
+    for (const b of document.querySelectorAll(".vt-tabs button")) b.classList.toggle("on", b.dataset.tab === tab);
+    requestAnimationFrame(() => document.dispatchEvent(new CustomEvent("tch:layout")));
+  }
+  // Thanh trên: công tắc ngày/đêm, nút đồng hồ nổi, chấm trạng thái + tên máy
+  function updateVtBar(snap = state.snap) {
     const sw = $("#vtTheme");
     sw.dataset.mode = document.documentElement.dataset.theme;
-    $("span", sw).textContent = { auto: "A", day: "☀", night: "☾" }[settings.ui.theme];
-    sw.title = { auto: "Tự động: ngày 6:00–18:00, đêm sau 18:00 (bấm để đổi)", day: "Chế độ ngày (bấm để đổi)", night: "Chế độ đêm (bấm để đổi)" }[settings.ui.theme];
-  }
-  function updateVtMachine(snap) {
-    const cpu = snap.sensors?.find((s) => s.id === snap.primary?.cpu);
-    if (cpu) $("#vtCpu").textContent = cpu.hardware;
+    sw.dataset.auto = settings.ui.theme === "auto" ? "1" : "";
+    sw.title = settings.ui.theme === "auto" ? "Đang tự động đổi ngày/đêm theo giờ – bấm để chọn cố định"
+      : document.documentElement.dataset.theme === "day" ? "Chế độ ngày – bấm để chuyển sang đêm" : "Chế độ đêm – bấm để chuyển sang ngày";
+    if (!snap) return;
     const ov = $("#vtOverlay"), ovState = state.demo ? null : snap.overlay;
     ov.disabled = ovState == null;
     ov.classList.toggle("on", ovState === true);
-    ov.textContent = ovState ? "Đang hiện đồng hồ nổi" : "Đồng hồ nổi góc màn hình";
-    ov.title = $("#btnOverlay").title;
+    ov.title = ovState == null ? "Đồng hồ nổi cần chạy app trên Windows có màn hình"
+      : ovState ? "Đang hiện đồng hồ nổi góc màn hình – bấm để ẩn" : "Hiện đồng hồ nổi ở góc màn hình, nằm trên mọi cửa sổ";
+    const live = $("#vtLive"), demo = state.demo || snap.mode === "demo";
+    live.dataset.state = demo ? "demo" : snap.mode === "live" ? "live" : "off";
+    $("#vtHost").textContent = `${vtHost || "Máy tính này"} · ${demo ? "dữ liệu mô phỏng" : snap.mode === "live" ? `đo mỗi ${snap.interval || settings.interval} giây` : "chưa đọc được cảm biến"}`;
   }
   const FAVICON_THERMAL = $("#favicon").href;
   // Ảnh nhân vật / logo do người dùng tải lên (lưu trong thư mục dữ liệu của app)
@@ -1133,7 +1147,7 @@
   function renderBank(snap) {
     const bank = $("#bank");
     const sensors = snap.sensors || [];
-    $("#bankCount").textContent = `${sensors.length} sensors`;
+    $("#bankCount").textContent = isVt() ? `${sensors.length} cảm biến` : `${sensors.length} sensors`;
     const fans = snap.metrics?.fans || [];
     const key = sensors.map((s) => s.id).join("|") + "#" + fans.map((f) => f.name + f.hardware).join("|");
     if (key !== bankKey) {
@@ -1216,6 +1230,7 @@
     if (stale) {
       const pill = $("#linkPill");
       if (pill.dataset.state !== "off") { pill.dataset.state = "off"; $("span", pill).textContent = "SIGNAL LOST"; }
+      if ($("#vtLive").dataset.state !== "off") { $("#vtLive").dataset.state = "off"; $("#vtHost").textContent = `${vtHost || "Máy tính này"} · mất tín hiệu`; }
     }
     requestAnimationFrame(frame);
   }
@@ -1290,11 +1305,13 @@
     rebuildAll();
   };
   const btnSound = $("#btnSound");
+  btnSound.textContent = settings.sound ? "ALARM ON" : "ALARM OFF";
+  btnSound.classList.toggle("on", settings.sound);
   btnSound.onclick = () => {
     settings.sound = !settings.sound;
+    store.set("sound", settings.sound);
     btnSound.textContent = settings.sound ? "ALARM ON" : "ALARM OFF";
     btnSound.classList.toggle("on", settings.sound);
-    if (isVt()) updateVtTop();
     lastBeep = 0;
     if (settings.sound) { audio ||= new (window.AudioContext || window.webkitAudioContext)(); audio.resume?.(); }
   };
@@ -1303,41 +1320,25 @@
       .catch(() => { /* bỏ qua */ });
   };
   // ---- điều khiển riêng của giao diện Việt Tâm (dùng lại các nút gốc)
-  $("#vtBell").onclick = () => btnSound.click();
-  $("#vtTheme").onclick = () => $("#btnTheme").click();
-  const VT_ACTS = {
-    settings: () => $("#btnSettings").click(),
-    overlay: () => $("#btnOverlay").click(),
-    unit: () => btnUnit.click(),
-    classic: () => $("#btnBrand").click(),
+  $("#vtOverlay").onclick = () => $("#btnOverlay").click();
+  $("#vtSettings").onclick = () => $("#btnSettings").click();
+  $("#vtTheme").onclick = () => {  // công tắc 2 trạng thái: ngày <-> đêm (Tự động chọn trong Cài đặt)
+    settings.ui = { ...settings.ui, theme: document.documentElement.dataset.theme === "day" ? "night" : "day" };
+    store.set("ui", settings.ui); saveServer({ ui: settings.ui });
+    applyTheme();
   };
-  for (const el of document.querySelectorAll("[data-act]")) {
-    el.addEventListener("click", (e) => { e.preventDefault(); VT_ACTS[el.dataset.act]?.(); });
+  for (const b of document.querySelectorAll(".vt-tabs button")) {
+    b.onclick = () => { setTab(b.dataset.tab); window.scrollTo({ top: 0 }); };
   }
-  const navLinks = [...document.querySelectorAll('.vt-nav a[href^="#"]:not([data-act])')];
-  for (const a of navLinks) {
-    a.addEventListener("click", (e) => {
-      e.preventDefault();
-      document.querySelector(a.getAttribute("href"))?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }
-  // Đánh dấu mục đang xem trên menu
-  const navSpy = new IntersectionObserver((entries) => {
-    for (const en of entries) {
-      if (!en.isIntersecting) continue;
-      for (const a of navLinks) a.classList.toggle("on", a.getAttribute("href") === `#${en.target.id}`);
-    }
-  }, { rootMargin: "-35% 0px -60% 0px" });
-  for (const a of navLinks) { const t = document.querySelector(a.getAttribute("href")); if (t) navSpy.observe(t); }
   if (hasBackend) {
-    fetch("api/info").then((r) => r.json()).then((i) => { if (i.host) $("#vtHost").textContent = i.host; }).catch(() => { /* bản cũ */ });
+    fetch("api/info").then((r) => r.json()).then((i) => { vtHost = i.host || ""; updateVtBar(); }).catch(() => { /* bản cũ */ });
   }
 
   $("#btnFull").onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.());
 
   const dlg = $("#settings");
   function fillSettings(useDefaults = false) {
-    $("#settingsRows").innerHTML = `<span class="h">ĐỒNG HỒ</span><span class="h">WARN °C</span><span class="h">CRIT °C</span>` +
+    $("#settingsRows").innerHTML = `<span class="h">ĐỒNG HỒ</span><span class="h">CẢNH BÁO</span><span class="h">NGUY HIỂM</span>` +
       GAUGES.map((g) => {
         const v = useDefaults ? g.defaults : g;
         return `<span>${g.title}</span><input type="number" step="1" min="30" max="120" data-k="${g.key}" data-f="warn" value="${v.warn}">` +
@@ -1349,6 +1350,10 @@
     $("#selInterval").value = String(settings.interval);
     $("#selHistory").value = String(settings.historyDays);
     $("#selBoardSrc").value = settings.boardSource;
+    $("#selBrand").value = settings.ui.brand;
+    $("#selTheme").value = settings.ui.theme;
+    $("#selUnit").value = settings.unit;
+    $("#chkSound").checked = settings.sound;
     dlg.showModal();
   };
   $("#btnReset").onclick = () => fillSettings(true);
@@ -1365,6 +1370,15 @@
     settings.historyDays = Number($("#selHistory").value) || 30;
     if ($("#selBoardSrc").value !== settings.boardSource) setBoardSource($("#selBoardSrc").value);
     saveServer({ thresholds: settings.thresholds, interval: settings.interval, history_days: settings.historyDays });
+    // Nhóm Hiển thị: dùng lại đúng logic của các nút trên thanh gốc
+    if ($("#chkSound").checked !== settings.sound) btnSound.click();
+    if ($("#selUnit").value !== settings.unit) btnUnit.click();
+    const ui = { ...settings.ui, brand: $("#selBrand").value, theme: $("#selTheme").value };
+    if (ui.brand !== settings.ui.brand || ui.theme !== settings.ui.theme) {
+      settings.ui = ui;
+      store.set("ui", settings.ui); saveServer({ ui: settings.ui });
+      applyTheme(); applyBrand();
+    }
     document.dispatchEvent(new CustomEvent("tch:settings"));
     rebuildAll();
   });

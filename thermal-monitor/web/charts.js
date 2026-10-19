@@ -280,11 +280,11 @@
       x.fillStyle = css("--chart-text"); x.fillText(`${e.label} ${e.v.toFixed(0)}°`, L + pw + 22, e.y);
     }
     cv._hit = { L, pw, T, ph, X, Y, present };
-    cv._img = x.getImageData(0, 0, cv.width, cv.height);
+    cv._img = cv.width && cv.height ? x.getImageData(0, 0, cv.width, cv.height) : null;  // khung đang ẩn: rộng 0
   }
   $("#histChart").addEventListener("mousemove", (e) => {
     const cv = e.currentTarget, h = cv._hit;
-    if (!h || !hist || e.offsetX < h.L || e.offsetX > h.L + h.pw) { tip(cv, null); return; }
+    if (!h || !hist || !cv._img || e.offsetX < h.L || e.offsetX > h.L + h.pw) { tip(cv, null); return; }
     // Điểm gần nhất theo thời gian
     let best = 0, bd = Infinity;
     hist.t.forEach((t, i) => { const d = Math.abs(h.X(t) - e.offsetX); if (d < bd) { bd = d; best = i; } });
@@ -400,6 +400,7 @@
   });
   const redrawAll = () => { drawCores(); if (lastSnap) renderDrives(lastSnap); drawLog(); };
   document.addEventListener("tch:theme", redrawAll);
+  document.addEventListener("tch:layout", redrawAll);  // đổi tab: biểu đồ vừa được hiện ra cần vẽ theo kích thước thật
   document.addEventListener("tch:settings", () => fetchLog(true));
   // Chỉ vẽ lại khi bề ngang đổi (vẽ biểu đồ làm trang cao lên/thấp xuống -> tránh vòng lặp)
   let rt, lastW = 0;

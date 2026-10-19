@@ -434,3 +434,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
 }
 .brand-slot label.btn:hover { border-color: var(--ui-accent); color: var(--ui-accent); }
 .brand-note { font-size: 12px !important; margin: 8px 0 0; }
+
+/* Nhóm trong hộp thoại cài đặt (dùng cho cả 2 giao diện) */
+.set-h { margin: 18px 0 8px; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ui-accent); }
+.set-note { margin: 0 0 10px; font-size: 12px !important; }
+.pick-slots .settings-interval:not(:has(select)) { display: none; }
+.pick-slots .pick { max-width: 260px; }
+input.toggle { width: 20px; height: 20px; accent-color: var(--ui-accent); }
+details.brand-up summary { cursor: pointer; font-size: 13px; color: var(--ui-accent); }
