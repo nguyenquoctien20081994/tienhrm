@@ -153,6 +153,8 @@ jobs:
 
           SHA256: ${{ steps.meta.outputs.sha256 }}
           "@
-          gh release create $tag dist/ThermalCoreHUD.exe dist/ThermalCoreHUD.exe.sha256 `
+          $assets = @('dist/ThermalCoreHUD.exe', 'dist/ThermalCoreHUD.exe.sha256')
+          if (Test-Path dist/overlay-screenshot.png) { $assets += 'dist/overlay-screenshot.png#Overlay preview (build machine)' }
+          gh release create $tag @assets `
             --target "${{ github.sha }}" --title "Thermal Core HUD v${{ steps.meta.outputs.version }} (build ${{ github.run_number }})" `
             --notes $notes --latest
