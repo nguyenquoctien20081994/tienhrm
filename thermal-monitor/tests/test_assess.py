@@ -113,7 +113,8 @@ class Rules(unittest.TestCase):
 class Interval(unittest.TestCase):
     def test_validation(self):
         self.assertEqual(app.validate_settings_patch({"interval": 15}), {"interval": 15})
-        for bad in (0, 1, 7, "15", 600):
+        self.assertEqual(app.validate_settings_patch({"interval": 1}), {"interval": 1})
+        for bad in (0, 2, 7, "15", 600, True):
             with self.assertRaises(ValueError):
                 app.validate_settings_patch({"interval": bad})
         self.assertEqual(app.DEFAULT_SETTINGS["interval"], 6)

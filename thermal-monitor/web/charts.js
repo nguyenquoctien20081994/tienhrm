@@ -60,7 +60,9 @@
     const names = cores.map((c) => c.name).join("|");
     if (names !== coreNames) { coreHist.length = 0; coreNames = names; }
     if (!cores.length) return;
-    coreHist.push({ t: snap.ts, cores });
+    // Mỗi cột >= 5 giây (60 phút <= 720 cột) kể cả khi đo 1 giây/lần; cột mới nhất luôn mang số mới
+    const last = coreHist[coreHist.length - 1];
+    if (last && snap.ts - last.t0 < 5) { last.t = snap.ts; last.cores = cores; } else coreHist.push({ t: snap.ts, t0: snap.ts, cores });
     while (coreHist.length && snap.ts - coreHist[0].t > 3600) coreHist.shift();
   }
   function drawCores() {

@@ -27,13 +27,19 @@ class HistoryDB:
         self.conn.execute("CREATE INDEX IF NOT EXISTS idx_samples_ts ON samples(ts)")
         self.conn.commit()
         self.last_prune = 0.0
+        self.last_ts = 0.0
 
     def close(self) -> None:
         with self.lock:
             self.conn.close()
 
     # ------------------------------------------------------------------ ghi
+    MIN_GAP = 5  # giây – đo 1 giây/lần thì nhật ký vẫn chỉ ghi 5 giây/lần (DB không phình, đỡ ghi ổ đĩa)
+
     def record(self, ts: float, values: dict, keep_days: int) -> None:
+        if 0 <= ts - self.last_ts < self.MIN_GAP:
+            return
+        self.last_ts = ts
         row = (int(ts),) + tuple(values.get(c) for c in COLUMNS)
         with self.lock:
             self.conn.execute(f"INSERT INTO samples (ts, {', '.join(COLUMNS)}) VALUES (?{', ?' * len(COLUMNS)})", row)

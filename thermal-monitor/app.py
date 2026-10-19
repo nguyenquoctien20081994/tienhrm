@@ -30,7 +30,7 @@ import history
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.9.0"
+APP_VERSION = "1.9.1"
 APP_AUTHOR = "Nguyễn Quốc Tiến"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
@@ -56,7 +56,7 @@ STATIC_TYPES = {".html": "text/html", ".js": "application/javascript", ".css": "
                 ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml", ".ico": "image/x-icon",
                 ".woff2": "font/woff2"}
 
-INTERVAL_CHOICES = (5, 6, 10, 15, 30, 60)
+INTERVAL_CHOICES = (1, 5, 6, 10, 15, 30, 60)
 SETTINGS_VERSION = 3  # 2: chu kỳ mặc định 15 s -> 6 s; 3: overlay trong suốt thêm 30%
 HISTORY_DAY_CHOICES = (7, 14, 30)
 UI_STYLES = ("hud", "cockpit")
@@ -162,7 +162,7 @@ def validate_settings_patch(patch) -> dict:
             raise ValueError("unit phải là C hoặc F")
         out["unit"] = patch["unit"]
     if "interval" in patch:
-        if patch["interval"] not in INTERVAL_CHOICES:
+        if isinstance(patch["interval"], bool) or patch["interval"] not in INTERVAL_CHOICES:  # True == 1 trong Python
             raise ValueError(f"interval phải là một trong {INTERVAL_CHOICES}")
         out["interval"] = patch["interval"]
     if "board_source" in patch:

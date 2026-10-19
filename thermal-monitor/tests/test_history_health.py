@@ -65,6 +65,16 @@ class HistoryDB(unittest.TestCase):
         self.assertEqual(n, 1)
         self.assertEqual(self.db.peak_clock(), 4100)
 
+    def test_one_second_interval_records_every_5s(self):
+        """Đo 1 giây/lần: nhật ký chỉ ghi 5 giây/lần, phút vượt ngưỡng vẫn tính đúng theo khoảng cách thực."""
+        now = time.time() - 600
+        for i in range(120):  # 2 phút, CPU 90°C (vượt ngưỡng 85)
+            self.db.record(now + i, {"cpu": 90.0, "cpu_load": 80}, keep_days=30)
+        n = self.db.conn.execute("SELECT COUNT(*) FROM samples").fetchone()[0]
+        self.assertEqual(n, 24)
+        r = self.db.report(1, TH)
+        self.assertEqual((r["step"], r["components"]["cpu"]["minutes_over_warn"]), (5, 2))
+
     def test_empty_report(self):
         self.assertEqual(self.db.report(7, TH)["samples"], 0)
 

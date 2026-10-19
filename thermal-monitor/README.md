@@ -1,6 +1,6 @@
 # Thermal Core HUD
 
-App chạy local trên máy tính, đo **nhiệt độ CPU, GPU, Mainboard, ổ cứng** (mặc định 6 giây/lần, chỉnh được 5–60 giây), có **thanh nhận định bằng lời** cho người không chuyên, giao diện đồng hồ cơ kết hợp HUD gaming/viễn tưởng.
+App chạy local trên máy tính, đo **nhiệt độ CPU, GPU, Mainboard, ổ cứng** (mặc định 6 giây/lần, chỉnh được 1 giây hoặc 5–60 giây), có **thanh nhận định bằng lời** cho người không chuyên, giao diện đồng hồ cơ kết hợp HUD gaming/viễn tưởng.
 
 Bản này được chỉnh cho **ThinkPad X1 Yoga Gen 5 · Intel Core i7-10610U · Intel UHD Graphics · Windows 11 Pro 25H2**, và vẫn chạy được trên các máy Windows/Linux khác.
 
@@ -188,7 +188,11 @@ ThermalCoreHUD.exe (hoặc python app.py)
     [--ui auto|window|browser|none] [--overlay] [--keep-running] [--version]
 ```
 
-- `--interval`: chu kỳ đo cho phiên này (mặc định lấy theo cài đặt, 6 giây; đổi lâu dài trong **CALIBRATE**).
+- `--interval`: chu kỳ đo cho phiên này (mặc định lấy theo cài đặt, 6 giây; đổi lâu dài trong **Cài đặt** / **CALIBRATE**).
+- **Đo 1 giây/lần**: màn hình và đồng hồ nổi cập nhật mỗi giây; nhật ký vẫn chỉ ghi 5 giây/lần để file nhật ký không phình to
+  và đỡ ghi ổ đĩa. LibreHardwareMonitor mặc định làm mới 1 giây/lần nên số liệu theo kịp; nếu dùng nguồn mainboard B, HWiNFO mặc
+  định chỉ làm mới 2 giây/lần – muốn 1 giây thì vào HWiNFO *Sensor Settings → Polling Period* đặt 1000 ms. Đo 1 giây tốn CPU hơn
+  một chút (app đọc và phân tích dữ liệu cảm biến mỗi giây); máy yếu nên dùng 5–6 giây.
 - `--overlay`: chỉ hiện overlay 3 đồng hồ, không mở cửa sổ chính. Có thể tạo shortcut với tham số này và đặt vào thư mục Startup (`Win + R` → `shell:startup`) để overlay tự bật khi khởi động máy.
 
 - `--no-manage-lhm`: không tự tải/bật LibreHardwareMonitor (khi anh tự quản lý LHM).
