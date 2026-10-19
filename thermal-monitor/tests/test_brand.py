@@ -91,8 +91,29 @@ class BrandEndpoints(unittest.TestCase):
             pass
         self.assertFalse(any(json.loads(self.req("GET", "/api/brand")[2]).values()))
 
-    def test_info_has_author(self):
-        self.assertEqual(json.loads(self.req("GET", "/api/info")[2])["author"], "Nguyễn Quốc Tiến")
+    def test_info_has_author_and_host(self):
+        info = json.loads(self.req("GET", "/api/info")[2])
+        self.assertEqual(info["author"], "Nguyễn Quốc Tiến")
+        self.assertTrue(info["host"])
+
+    def test_static_types_do_not_depend_on_registry(self):
+        web = os.path.join(os.path.dirname(__file__), "..", "web")
+        handler = app.make_handler(mock.Mock(), web, app.SettingsStore(None))
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            with mock.patch("mimetypes.guess_type", return_value=("text/plain", None)):  # registry Windows lỗi
+                for path, ctype in (("/app.js", "application/javascript"), ("/viettam.css", "text/css"),
+                                    ("/img/vt/nam-cool.webp", "image/webp"), ("/fonts/fonts.css", "text/css")):
+                    c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=5)
+                    c.request("GET", path)
+                    r = c.getresponse()
+                    r.read()
+                    c.close()
+                    self.assertEqual((r.status, r.getheader("Content-Type").split(";")[0]), (200, ctype), path)
+        finally:
+            srv.shutdown()
+            srv.server_close()
 
 
 if __name__ == "__main__":

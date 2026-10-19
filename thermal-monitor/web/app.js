@@ -159,6 +159,7 @@
 
   // ------------------------------------------------------------------ vẽ tĩnh (vành, mặt số, vạch chia)
   function buildLayers(g) {
+    if (isVt()) return buildGloss(g);
     if (settings.ui.style === "cockpit") return buildTape(g);
     const rect = g.dial.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
@@ -305,6 +306,200 @@
     }
   }
 
+
+  // ------------------------------------------------------------------ kiểu VIỆT TÂM: đồng hồ nổi khối 3D, bóng sáng
+  const TAU = Math.PI * 2;
+  const FONT_VT_NUM = '"Oswald", "Bahnschrift", "Arial Narrow", sans-serif';
+  const FONT_VT = '"Nunito", "Segoe UI", sans-serif';
+  const GLOSS = {
+    day: {
+      base0: "#ffffff", base1: "#dfe7f2", shadow: "rgba(22,60,130,0.30)", rimHi: "rgba(255,255,255,1)", rimLo: "rgba(140,162,196,0.55)",
+      face0: "#f7faff", face1: "#e9eff7", track: "#e3eaf4", inset: "rgba(18,48,100,0.42)", zoneOk: "rgba(31,111,229,0.16)",
+      tick: "#a3b4cb", label: "#5b6f8f", hub0: "#ffffff", hub1: "#e6edf6", hubShadow: "rgba(22,60,130,0.28)",
+      ink: "#0c2a66", muted: "#7486a3", bead1: "#d9e3ef", glare: 0.6,
+    },
+    night: {
+      base0: "#20355a", base1: "#0b172d", shadow: "rgba(0,0,0,0.65)", rimHi: "rgba(255,255,255,0.22)", rimLo: "rgba(0,0,0,0.5)",
+      face0: "#16294a", face1: "#0e1c35", track: "#0a1528", inset: "rgba(0,0,0,0.85)", zoneOk: "rgba(74,155,255,0.20)",
+      tick: "#4a6187", label: "#9fb3d1", hub0: "#27406a", hub1: "#12223f", hubShadow: "rgba(0,0,0,0.6)",
+      ink: "#eef4ff", muted: "#90a4c4", bead1: "#c3d1e6", glare: 0.12,
+    },
+  };
+  const GLOSS_LEVEL = {
+    ok: ["#79c0ff", "#1f6fe5"], warn: ["#ffd36b", "#f08a00"], crit: ["#ff9a9a", "#d7262d"], none: ["#c3cede", "#93a3ba"],
+  };
+  const GLOSS_STATE = { ok: "ỔN ĐỊNH", warn: "CAO", crit: "QUÁ NHIỆT" };
+
+  // Cung tròn có 2 đầu bo tròn (dạng viên thuốc uốn cong), tâm ở gốc toạ độ
+  function capsArc(x, r, w, a0, a1) {
+    const h = w / 2;
+    x.beginPath();
+    x.arc(0, 0, r + h, a0, a1);
+    x.arc(Math.cos(a1) * r, Math.sin(a1) * r, h, a1, a1 + Math.PI);
+    x.arc(0, 0, r - h, a1, a0, true);
+    x.arc(Math.cos(a0) * r, Math.sin(a0) * r, h, a0 + Math.PI, a0 + TAU);
+    x.closePath();
+  }
+
+  function buildGloss(g) {
+    const rect = g.dial.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const S = Math.round(rect.width * dpr);
+    if (!S) return;
+    g.size = S; g.dpr = dpr;
+    g.dial.width = g.dial.height = S;
+    const R = S / 2, sc = scaleOf(g.cfg);
+    const P = document.documentElement.dataset.theme === "day" ? GLOSS.day : GLOSS.night;
+    const TR = R * 0.68, TW = R * 0.13;
+    const c = document.createElement("canvas"); c.width = c.height = S;
+    const x = c.getContext("2d"); x.translate(R, R);
+
+    // Đế tròn nổi khỏi mặt thẻ
+    x.save();
+    x.shadowColor = P.shadow; x.shadowBlur = R * 0.12; x.shadowOffsetY = R * 0.06;
+    const base = x.createLinearGradient(0, -R, 0, R);
+    base.addColorStop(0, P.base0); base.addColorStop(1, P.base1);
+    x.beginPath(); x.arc(0, 0, R * 0.9, 0, TAU); x.fillStyle = base; x.fill();
+    x.restore();
+    const rim = x.createLinearGradient(0, -R, 0, R);
+    rim.addColorStop(0, P.rimHi); rim.addColorStop(0.55, "rgba(255,255,255,0)"); rim.addColorStop(1, P.rimLo);
+    x.beginPath(); x.arc(0, 0, R * 0.895, 0, TAU); x.lineWidth = R * 0.014; x.strokeStyle = rim; x.stroke();
+    // Mặt lõm bên trong
+    const face = x.createLinearGradient(0, -R * 0.84, 0, R * 0.84);
+    face.addColorStop(0, P.face1); face.addColorStop(1, P.face0);
+    x.beginPath(); x.arc(0, 0, R * 0.84, 0, TAU); x.fillStyle = face; x.fill();
+
+    // Rãnh lõm của vòng đo (bóng đổ bên trong)
+    capsArc(x, TR, TW, START, START + SWEEP);
+    x.fillStyle = P.track; x.fill();
+    x.save();
+    capsArc(x, TR, TW, START, START + SWEEP); x.clip();
+    x.shadowColor = P.inset; x.shadowBlur = TW * 0.45; x.shadowOffsetY = TW * 0.16;
+    capsArc(x, TR, TW, START, START + SWEEP);
+    x.lineWidth = TW * 0.5; x.strokeStyle = P.track; x.stroke();
+    x.restore();
+
+    // Vạch vùng nhiệt bên ngoài rãnh: xanh (an toàn) – cam (cảnh báo) – đỏ (nguy hiểm)
+    const ZR = TR + TW / 2 + R * 0.045, ZW = R * 0.022;
+    const zone = (a, z, col) => {
+      if (z <= a) return;
+      capsArc(x, ZR, ZW, angleOf(sc, a), angleOf(sc, z)); x.fillStyle = col; x.fill();
+    };
+    zone(sc.min, conv(g.cfg.warn) - 0.4, P.zoneOk);
+    zone(conv(g.cfg.warn), conv(g.cfg.crit) - 0.4, "#f2a31b");
+    zone(conv(g.cfg.crit), sc.max, "#e0393f");
+
+    // Chấm chia độ + số
+    x.textAlign = "center"; x.textBaseline = "middle";
+    x.font = `700 ${Math.max(R * 0.072, 8 * dpr)}px ${FONT_VT}`;
+    for (let v = sc.min; v <= sc.max + 1e-6; v += sc.major) {
+      const a = angleOf(sc, v), r1 = TR - TW / 2 - R * 0.05, r2 = TR - TW / 2 - R * 0.13;
+      x.beginPath(); x.arc(Math.cos(a) * r1, Math.sin(a) * r1, R * 0.013, 0, TAU); x.fillStyle = P.tick; x.fill();
+      x.fillStyle = P.label; x.fillText(String(v), Math.cos(a) * r2, Math.sin(a) * r2);
+    }
+
+    // Tâm vòm nổi
+    x.save();
+    x.shadowColor = P.hubShadow; x.shadowBlur = R * 0.08; x.shadowOffsetY = R * 0.035;
+    const hub = x.createRadialGradient(-R * 0.1, -R * 0.14, R * 0.02, 0, 0, R * 0.36);
+    hub.addColorStop(0, P.hub0); hub.addColorStop(1, P.hub1);
+    x.beginPath(); x.arc(0, 0, R * 0.34, 0, TAU); x.fillStyle = hub; x.fill();
+    x.restore();
+    const hubRim = x.createLinearGradient(0, -R * 0.34, 0, R * 0.34);
+    hubRim.addColorStop(0, P.rimHi); hubRim.addColorStop(1, "rgba(255,255,255,0)");
+    x.beginPath(); x.arc(0, 0, R * 0.335, 0, TAU); x.lineWidth = R * 0.01; x.strokeStyle = hubRim; x.stroke();
+
+    g.layers = { kind: "gloss", bg: c, sc, P, TR, TW, ZR };
+  }
+
+  function drawGloss(g, now) {
+    const x = g.dial.getContext("2d");
+    const S = g.size, R = S / 2, { sc, P, TR, TW, ZR } = g.layers, t = now / 1000;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.clearRect(0, 0, S, S);
+    x.drawImage(g.layers.bg, 0, 0);
+    x.translate(R, R);
+    const live = g.target != null && !g.stale;
+    const v = g.disp, dv = conv(v);
+    const lvl = live ? levelOf(g.cfg, v) : "none";
+    const [c0, c1] = GLOSS_LEVEL[lvl];
+    const a = Math.max(START + 0.02, angleOf(sc, dv));
+
+    // Vòng đo bóng: màu xanh khi ổn, cam khi cao, đỏ khi quá nhiệt
+    if (live) {
+      // Nhạt ở đầu -> đậm ở đầu kim. Đầu bo tròn lấn ra trước START (vị trí ~0.99 của gradient) nên cuối dải quay về màu nhạt
+      const grad = x.createConicGradient(START, 0, 0), e = (a - START) / TAU;
+      grad.addColorStop(0, c0); grad.addColorStop(e, c1); grad.addColorStop(Math.max(e + 0.001, 0.95), c1); grad.addColorStop(1, c0);
+      x.save();
+      x.shadowColor = hexA(c1, 0.45); x.shadowBlur = R * 0.06; x.shadowOffsetY = R * 0.02;
+      capsArc(x, TR, TW * 0.8, START, a); x.fillStyle = grad; x.fill();
+      x.restore();
+      capsArc(x, TR + TW * 0.16, TW * 0.2, START, a); x.fillStyle = "rgba(255,255,255,0.38)"; x.fill();  // vệt sáng
+    }
+    // Mốc thấp nhất / cao nhất của phiên
+    for (const [val, col] of [[g.min, "#1f8fd6"], [g.max, "#e0621b"]]) {
+      if (val == null) continue;
+      const m = angleOf(sc, conv(val));
+      x.beginPath(); x.arc(Math.cos(m) * ZR, Math.sin(m) * ZR, R * 0.024, 0, TAU);
+      x.fillStyle = col; x.fill(); x.lineWidth = R * 0.008; x.strokeStyle = "#fff"; x.stroke();
+    }
+    // Núm 3D ở đầu vòng đo
+    if (live) {
+      const bx = Math.cos(a) * TR, by = Math.sin(a) * TR, br = TW * 0.66;
+      x.save();
+      x.shadowColor = "rgba(10,30,70,0.45)"; x.shadowBlur = R * 0.05; x.shadowOffsetY = R * 0.025;
+      const bead = x.createRadialGradient(bx - br * 0.35, by - br * 0.45, br * 0.1, bx, by, br);
+      bead.addColorStop(0, "#ffffff"); bead.addColorStop(1, P.bead1);
+      x.beginPath(); x.arc(bx, by, br, 0, TAU); x.fillStyle = bead; x.fill();
+      x.restore();
+      const dot = x.createRadialGradient(bx - br * 0.12, by - br * 0.15, 0, bx, by, br * 0.42);
+      dot.addColorStop(0, c0); dot.addColorStop(1, c1);
+      x.beginPath(); x.arc(bx, by, br * 0.4, 0, TAU); x.fillStyle = dot; x.fill();
+    }
+
+    // Số đo ở tâm
+    x.textAlign = "center"; x.textBaseline = "middle";
+    x.fillStyle = live ? P.ink : P.muted;
+    x.font = `600 ${R * 0.27}px ${FONT_VT_NUM}`;
+    x.fillText(live ? dv.toFixed(1) : "--", 0, -R * 0.035);
+    x.font = `800 ${Math.max(R * 0.068, 8 * g.dpr)}px ${FONT_VT}`;
+    x.fillStyle = P.muted;
+    if (live) {
+      const tr = trendOf(g);
+      const trTxt = tr == null ? "" : `  ${tr > 0.3 ? "▲" : tr < -0.3 ? "▼" : "•"} ${(settings.unit === "F" ? tr * 9 / 5 : tr).toFixed(1)}/ph`;
+      x.fillText(`°${settings.unit}${trTxt}`, 0, R * 0.19);
+    } else {
+      x.fillText(g.stale ? "MẤT TÍN HIỆU" : g.sensor ? "ĐANG NGỦ" : "KHÔNG CÓ CẢM BIẾN", 0, R * 0.19);
+    }
+
+    // Nhãn trạng thái ở khe dưới vòng đo
+    if (live) {
+      const label = GLOSS_STATE[lvl], w = R * 0.6, h = R * 0.15, y = R * 0.66;
+      x.save();
+      x.shadowColor = hexA(c1, 0.4); x.shadowBlur = R * 0.04; x.shadowOffsetY = R * 0.015;
+      const pg = x.createLinearGradient(0, y - h / 2, 0, y + h / 2);
+      pg.addColorStop(0, c0); pg.addColorStop(1, c1);
+      roundRect(x, -w / 2, y - h / 2, w, h, h / 2); x.fillStyle = pg; x.fill();
+      x.restore();
+      x.font = `800 ${Math.max(R * 0.07, 8 * g.dpr)}px ${FONT_VT}`; x.fillStyle = "#fff";
+      x.fillText(label, 0, y + R * 0.004);
+    }
+
+    // Mặt kính phản quang
+    x.save();
+    x.beginPath(); x.arc(0, 0, R * 0.84, 0, TAU); x.clip();
+    const glare = x.createLinearGradient(0, -R * 0.84, 0, R * 0.05);
+    glare.addColorStop(0, `rgba(255,255,255,${P.glare})`); glare.addColorStop(1, "rgba(255,255,255,0)");
+    x.beginPath(); x.ellipse(0, -R * 0.42, R * 0.74, R * 0.42, 0, 0, TAU); x.fillStyle = glare; x.fill();
+    x.restore();
+
+    // Quá nhiệt: vành đỏ nhấp nháy
+    if (lvl === "crit") {
+      x.beginPath(); x.arc(0, 0, R * 0.885, 0, TAU);
+      x.lineWidth = R * 0.025; x.strokeStyle = `rgba(215,38,45,${0.35 + 0.35 * Math.sin(t * 7)})`; x.stroke();
+    }
+  }
+
   // ------------------------------------------------------------------ vẽ động mỗi khung hình
   // ------------------------------------------------------------------ kiểu BUỒNG LÁI: thanh đo dọc
   function buildTape(g) {
@@ -426,6 +621,7 @@
   function drawDial(g, now) {
     if (!g.layers) return;
     if (g.layers.kind === "tape") return drawTape(g, now);
+    if (g.layers.kind === "gloss") return drawGloss(g, now);
     const x = g.dial.getContext("2d");
     const S = g.size, R = S / 2, sc = g.layers.sc;
     const t = now / 1000;
@@ -672,7 +868,8 @@
     }
     updateHeader(snap);
     renderVerdict(snap.assessment);
-    renderCrew(snap.assessment);
+    renderVt(snap.assessment);
+    if (isVt()) updateVtMachine(snap);
     if (snap.version) $("#footVersion").textContent = `THERMAL CORE HUD v${snap.version}`;
     renderTele(snap);
     updateSourceSwitch(snap.metrics?.board_source);
@@ -733,9 +930,12 @@
     const h = new Date().getHours();
     const theme = mode === "auto" ? (h >= 6 && h < 18 ? "day" : "night") : mode;
     if (document.documentElement.dataset.theme !== theme) {
+      const first = !document.documentElement.dataset.theme;
       document.documentElement.dataset.theme = theme;
       document.dispatchEvent(new CustomEvent("tch:theme", { detail: theme }));
+      if (!first && isVt()) gauges.forEach(buildLayers);  // mặt đồng hồ Việt Tâm đổi màu theo ngày/đêm
     }
+    if (isVt()) updateVtTop();
     $("#btnTheme").textContent = { auto: "◐ AUTO", day: "☀ NGÀY", night: "☾ ĐÊM" }[mode];
   }
   function updateStyleButton() {
@@ -769,38 +969,84 @@
     unknown: ["Đang đọc cảm biến…", "Chờ mình một chút nha!"],
   };
   const CREW_LEVELS = Object.keys(CREW_LINES);
+  const VT_CHIP = { cool: "RẤT MÁT", normal: "BÌNH THƯỜNG", warm: "HƠI ẤM", hot: "NÓNG", critical: "QUÁ NHIỆT", unknown: "ĐANG ĐỌC" };
+  // Màu mức nhiệt trên nền sáng của giao diện Việt Tâm (đậm hơn bản neon để đủ tương phản)
+  const VT_LEVEL = { cool: "#1f8fd6", normal: "#1e9a59", warm: "#d98a00", hot: "#e0621b", critical: "#d7262d", unknown: "#7486a3" };
   let brandHave = {};  // ảnh người dùng tự tải lên (thay cho ảnh có sẵn)
   let crewPreloaded = false;
-  function renderCrew(a) {
-    const crew = $("#crew");
-    if (crew.hidden) return;
+  const isVt = () => settings.ui.brand === "viettam";
+  const poseSrc = (slot, level) => (brandHave[slot] ? `api/brand/${slot}?v=${brandStamp}` : `img/vt/${slot}-${level}.webp`);
+  function setSrc(img, src) { if (img.getAttribute("src") !== src) img.setAttribute("src", src); }
+
+  // Thẻ chào + thanh lời khuyên: nhân vật đổi tư thế, nhận định nhiệt độ, điểm nhiệt
+  function renderVt(a) {
+    if (!isVt()) return;
     const level = a?.level || "unknown";
-    crew.dataset.level = level;
-    for (const mate of crew.querySelectorAll(".mate")) {
-      const slot = mate.dataset.slot, img = $("img", mate);
-      const src = brandHave[slot] ? `api/brand/${slot}?v=${brandStamp}` : `img/vt/${slot}-${level}.webp`;
-      if (img.getAttribute("src") !== src) img.setAttribute("src", src);
-      $(".fig", mate).classList.toggle("has-img", !!brandHave[slot]);
-    }
-    crew.style.setProperty("--lv", LEVEL_COLOR[level] || LEVEL_COLOR.unknown);
+    const lv = VT_LEVEL[level] || VT_LEVEL.unknown;
+    const hello = $("#vtHello");
+    hello.dataset.level = level;
+    hello.style.setProperty("--lv", lv);
+    setSrc($("#vtNam"), poseSrc("nam", level));
+    setSrc($("#vtNu"), poseSrc("nu", level));
     const [nam, nu] = CREW_LINES[level] || CREW_LINES.unknown;
-    $("#sayNam").textContent = nam;
+    $("#vtChip").textContent = VT_CHIP[level] || VT_CHIP.unknown;
+    $("#vtTitle").textContent = a ? `Chào bạn! ${a.headline}` : "Chào bạn! Đang đọc cảm biến…";
+    $("#vtSay").textContent = nam;
+    $("#vtDetail").textContent = a?.detail || "";
+    $("#vtTips").innerHTML = (a?.tips || []).slice(1).map((t) => `<li>${esc(t)}</li>`).join("");
     // Có lời khuyên cụ thể (vd. ổ cứng sắp hỏng) thì nhân vật nữ nhắc lời khuyên đó
-    $("#sayNu").textContent = (a?.tips && a.tips[0]) || nu;
+    $("#vtTipText").textContent = (a?.tips && a.tips[0]) || nu;
+    $("#vtScore").textContent = a?.score ?? "--";
+    const ring = $("#vtRing"), len = 2 * Math.PI * 50;
+    ring.style.strokeDasharray = `${len}`;
+    ring.style.strokeDashoffset = `${len * (1 - (a?.score ?? 0) / 100)}`;
+    const hot = gauges.filter((g) => g.level === "warn" || g.level === "crit").length;
+    const badge = $("#vtBell em");
+    badge.hidden = !hot;
+    badge.textContent = hot;
   }
+
   function applyBrand() {
-    const vt = settings.ui.brand === "viettam";
+    const vt = isVt();
+    const was = document.documentElement.dataset.brand;
     document.documentElement.dataset.brand = vt ? "viettam" : "thermal";
     document.title = vt ? "Việt Tâm · Giám sát nhiệt độ" : "Thermal Core HUD";
     $("#btnBrand").textContent = vt ? "THERMAL" : "VIỆT TÂM";
-    $("#btnBrand").title = vt ? "Về giao diện Thermal Core gốc" : "Đổi sang giao diện Việt Tâm (có nhân vật)";
-    $("#crew").hidden = !vt;
+    $("#btnBrand").title = vt ? "Về giao diện Thermal Core gốc" : "Đổi sang giao diện Việt Tâm";
     $("#favicon").href = vt ? "img/vt/logo.png" : FAVICON_THERMAL;
     if (vt && !crewPreloaded) {  // tải trước mọi tư thế để đổi hình không bị chớp
       crewPreloaded = true;
       for (const slot of ["nam", "nu"]) for (const lv of CREW_LEVELS) new Image().src = `img/vt/${slot}-${lv}.webp`;
     }
-    if (vt) { loadBrandImages(); renderCrew(state.snap?.assessment); }
+    if (vt) {
+      loadBrandImages(); renderVt(state.snap?.assessment); updateVtTop();
+      Promise.all([document.fonts?.load(`600 20px ${FONT_VT_NUM}`), document.fonts?.load(`800 20px ${FONT_VT}`)])
+        .then(() => gauges.forEach(buildLayers)).catch(() => { /* dùng font dự phòng */ });
+    }
+    if (was && was !== document.documentElement.dataset.brand) {
+      // Đồng hồ và biểu đồ vẽ bằng canvas: vẽ lại theo bộ màu mới
+      gauges.forEach(buildLayers);
+      document.dispatchEvent(new CustomEvent("tch:theme", { detail: document.documentElement.dataset.theme }));
+    }
+  }
+  // Thanh trên của giao diện Việt Tâm: chuông còi cảnh báo, công tắc ngày/đêm
+  function updateVtTop() {
+    const bell = $("#vtBell");
+    bell.classList.toggle("on", settings.sound);
+    bell.title = settings.sound ? "Còi cảnh báo quá nhiệt: đang BẬT (bấm để tắt)" : "Còi cảnh báo quá nhiệt: đang tắt (bấm để bật)";
+    const sw = $("#vtTheme");
+    sw.dataset.mode = document.documentElement.dataset.theme;
+    $("span", sw).textContent = { auto: "A", day: "☀", night: "☾" }[settings.ui.theme];
+    sw.title = { auto: "Tự động: ngày 6:00–18:00, đêm sau 18:00 (bấm để đổi)", day: "Chế độ ngày (bấm để đổi)", night: "Chế độ đêm (bấm để đổi)" }[settings.ui.theme];
+  }
+  function updateVtMachine(snap) {
+    const cpu = snap.sensors?.find((s) => s.id === snap.primary?.cpu);
+    if (cpu) $("#vtCpu").textContent = cpu.hardware;
+    const ov = $("#vtOverlay"), ovState = state.demo ? null : snap.overlay;
+    ov.disabled = ovState == null;
+    ov.classList.toggle("on", ovState === true);
+    ov.textContent = ovState ? "Đang hiện đồng hồ nổi" : "Đồng hồ nổi góc màn hình";
+    ov.title = $("#btnOverlay").title;
   }
   const FAVICON_THERMAL = $("#favicon").href;
   // Ảnh nhân vật / logo do người dùng tải lên (lưu trong thư mục dữ liệu của app)
@@ -811,7 +1057,7 @@
       try { const r = await fetch("api/brand", { cache: "no-store" }); if (r.ok) have = await r.json(); } catch { /* app đã tắt */ }
     }
     brandHave = have;
-    renderCrew(state.snap?.assessment);
+    renderVt(state.snap?.assessment);
     $("#vtLogo").src = have.logo ? `api/brand/logo?v=${brandStamp}` : "img/vt/logo.png";
     for (const row of document.querySelectorAll(".brand-slot")) {
       const slot = row.dataset.slot;
@@ -1032,7 +1278,7 @@
   };
   setInterval(applyTheme, 60000);  // chế độ tự động đổi theo giờ (6:00–18:00 là ngày)
   applyTheme(); updateStyleButton(); applyBrand();
-  console.info("%cThermal Core HUD – thiết kế & phát triển: Nguyễn Quốc Tiến (nguyenquoctien)", "color:#df6b33;font-weight:bold");
+  console.info("%cThermal Core HUD – thiết kế & phát triển: Nguyễn Quốc Tiến (nguyenquoctien)", "color:#1f6fe5;font-weight:bold");
 
   const btnUnit = $("#btnUnit");
   btnUnit.textContent = "°" + settings.unit;
@@ -1048,6 +1294,7 @@
     settings.sound = !settings.sound;
     btnSound.textContent = settings.sound ? "ALARM ON" : "ALARM OFF";
     btnSound.classList.toggle("on", settings.sound);
+    if (isVt()) updateVtTop();
     lastBeep = 0;
     if (settings.sound) { audio ||= new (window.AudioContext || window.webkitAudioContext)(); audio.resume?.(); }
   };
@@ -1055,6 +1302,37 @@
     fetch("api/overlay", { method: "POST", headers: { "Content-Type": "application/json", "X-TCH": "1" }, body: JSON.stringify({ action: "toggle" }) })
       .catch(() => { /* bỏ qua */ });
   };
+  // ---- điều khiển riêng của giao diện Việt Tâm (dùng lại các nút gốc)
+  $("#vtBell").onclick = () => btnSound.click();
+  $("#vtTheme").onclick = () => $("#btnTheme").click();
+  const VT_ACTS = {
+    settings: () => $("#btnSettings").click(),
+    overlay: () => $("#btnOverlay").click(),
+    unit: () => btnUnit.click(),
+    classic: () => $("#btnBrand").click(),
+  };
+  for (const el of document.querySelectorAll("[data-act]")) {
+    el.addEventListener("click", (e) => { e.preventDefault(); VT_ACTS[el.dataset.act]?.(); });
+  }
+  const navLinks = [...document.querySelectorAll('.vt-nav a[href^="#"]:not([data-act])')];
+  for (const a of navLinks) {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      document.querySelector(a.getAttribute("href"))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+  // Đánh dấu mục đang xem trên menu
+  const navSpy = new IntersectionObserver((entries) => {
+    for (const en of entries) {
+      if (!en.isIntersecting) continue;
+      for (const a of navLinks) a.classList.toggle("on", a.getAttribute("href") === `#${en.target.id}`);
+    }
+  }, { rootMargin: "-35% 0px -60% 0px" });
+  for (const a of navLinks) { const t = document.querySelector(a.getAttribute("href")); if (t) navSpy.observe(t); }
+  if (hasBackend) {
+    fetch("api/info").then((r) => r.json()).then((i) => { if (i.host) $("#vtHost").textContent = i.host; }).catch(() => { /* bản cũ */ });
+  }
+
   $("#btnFull").onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.());
 
   const dlg = $("#settings");
@@ -1096,6 +1374,10 @@
     const d = new Date();
     $("#clock").textContent = d.toLocaleTimeString("vi-VN", { hour12: false });
     $("#date").textContent = d.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }).toUpperCase();
+    // Ngày viết tay ở thẻ chào: "Thứ Hai, 19 tháng 10, 2026 · 15:18"
+    const wd = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"][d.getDay()];
+    const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    $("#vtDate").textContent = `${wd}, ${String(d.getDate()).padStart(2, "0")} tháng ${d.getMonth() + 1}, ${d.getFullYear()} · ${hm}`;
   }
   clockTick(); setInterval(clockTick, 1000);
   setInterval(tickCountdown, 500);
@@ -1106,6 +1388,7 @@
   window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener?.("change", () => gauges.forEach(buildLayers));
 
   gauges.forEach(buildLayers);
+  document.fonts?.ready.then(() => gauges.forEach(buildLayers));  // chữ trên mặt đồng hồ dùng font đóng gói sẵn
   requestAnimationFrame(frame);
   connect();
 })();

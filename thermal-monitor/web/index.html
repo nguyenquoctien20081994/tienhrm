@@ -6,13 +6,39 @@
   <meta name="author" content="nguyenquoctien – Nguyễn Quốc Tiến" />
   <title>Thermal Core HUD</title>
   <link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%2322e5ff' stroke-width='3'/%3E%3Cpath d='M16 16 L24 9' stroke='%23ff4d2e' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="fonts/fonts.css" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="viettam.css" />
 </head>
 <body>
   <div class="fx-grid" aria-hidden="true"></div>
   <div class="fx-scan" aria-hidden="true"></div>
   <div class="fx-vignette" aria-hidden="true"></div>
   <div class="fx-sign" aria-hidden="true"></div>
+
+  <!-- ===== Giao diện Việt Tâm: menu trái (theo mẫu trang chủ nội bộ) ===== -->
+  <aside class="vt-side" aria-label="Menu">
+    <div class="vt-mark">
+      <img id="vtLogo" src="img/vt/logo.png" alt="Logo Việt Tâm" />
+      <div><b>VIET TAM</b><small>CONSTRUCTION MECHANICAL</small></div>
+    </div>
+    <nav class="vt-nav">
+      <a href="#vtHello" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Tổng quan</span></a>
+      <a href="#corePanel"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg><span>Nhân CPU</span></a>
+      <a href="#drivePanel"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="3"/><circle cx="16.5" cy="12" r="1.4"/><path d="M6.5 12h5"/></svg><span>Sức khoẻ ổ cứng</span></a>
+      <a href="#logPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 20h16"/><path d="m7 15 4-5 3 3 5-7"/></svg><span>Nhật ký nhiệt độ</span></a>
+      <a href="#bankSection"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg><span>Tất cả cảm biến</span></a>
+      <a href="#" data-act="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg><span>Cài đặt cảnh báo</span></a>
+    </nav>
+    <div class="vt-quick">
+      <h4>Công cụ nhanh:</h4>
+      <a href="#" data-act="overlay">+ Bật/tắt đồng hồ nổi</a>
+      <a href="#" data-act="unit">+ Đổi đơn vị °C / °F</a>
+      <a href="api/diagnostics" download>+ Xuất file chẩn đoán</a>
+      <a href="#" data-act="classic">+ Giao diện Thermal Core</a>
+    </div>
+    <p class="vt-by">Thiết kế &amp; phát triển<br /><span>Nguyễn Quốc Tiến</span></p>
+  </aside>
 
   <header class="hud-top">
     <div class="brand brand-thermal">
@@ -24,13 +50,6 @@
       <div>
         <h1>THERMAL<span>CORE</span></h1>
         <small>REALTIME HARDWARE TEMPERATURE HUD</small>
-      </div>
-    </div>
-    <div class="brand brand-vt">
-      <div class="vt-logo"><img id="vtLogo" alt="Logo Việt Tâm" src="img/vt/logo.png" /></div>
-      <div>
-        <h1>VIỆT<span>TÂM</span></h1>
-        <small>GIÁM SÁT NHIỆT ĐỘ MÁY TÍNH · THERMAL CORE</small>
       </div>
     </div>
 
@@ -53,6 +72,14 @@
         <button id="btnSettings" title="Chỉnh ngưỡng cảnh báo">CALIBRATE</button>
         <button id="btnFull" title="Toàn màn hình">⛶</button>
       </div>
+      <div class="vt-top">
+        <button type="button" id="vtBell" class="vt-bell" title="Còi cảnh báo khi quá nhiệt: đang tắt (bấm để bật)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><em hidden>0</em></button>
+        <button type="button" id="vtTheme" class="vt-switch" title="Chế độ ngày / đêm / tự động theo giờ"><i></i><span>◐</span></button>
+        <div class="vt-me">
+          <img src="img/vt/nam-unknown.webp" alt="" />
+          <div><b id="vtHost">Máy tính này</b><small id="vtCpu">Đang đọc cấu hình…</small></div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -69,21 +96,34 @@
     </div>
   </section>
 
-  <!-- Giao diện Việt Tâm: 2 nhân vật nói tình trạng máy; tư thế đổi theo mức nhiệt (web/img/vt/<nam|nu>-<mức>.webp).
-       Có thể thay bằng ảnh khác trong CALIBRATE. -->
-  <section id="crew" class="crew" data-level="unknown" hidden>
-    <div class="mate" data-slot="nam">
-      <figure class="fig">
-        <img alt="Nhân vật nam" src="img/vt/nam-unknown.webp" />
-      </figure>
-      <p class="bubble" id="sayNam">Đang đọc cảm biến…</p>
+  <!-- ===== Giao diện Việt Tâm: thẻ chào + thanh lời khuyên. Nhân vật đổi tư thế theo mức nhiệt
+       (web/img/vt/<nam|nu>-<mức>.webp); có thể thay ảnh trong CALIBRATE. ===== -->
+  <section id="vtHello" class="vt-hello" data-level="unknown">
+    <figure class="vt-fig"><img id="vtNam" data-slot="nam" src="img/vt/nam-unknown.webp" alt="Nhân viên Việt Tâm" /></figure>
+    <div class="vt-hello-body">
+      <p class="vt-date"><span id="vtDate">—</span><em class="vt-chip" id="vtChip">ĐANG ĐỌC</em></p>
+      <h2 id="vtTitle">Chào bạn! Đang đọc cảm biến…</h2>
+      <p class="vt-say" id="vtSay">Chờ mình một chút nha!</p>
+      <p class="vt-detail" id="vtDetail"></p>
+      <ul class="vt-tips" id="vtTips"></ul>
     </div>
-    <div class="mate right" data-slot="nu">
-      <p class="bubble" id="sayNu">Chờ mình một chút nha!</p>
-      <figure class="fig">
-        <img alt="Nhân vật nữ" src="img/vt/nu-unknown.webp" />
-      </figure>
+    <div class="vt-score" title="Điểm nhiệt: 100 = rất mát, 60 = chạm ngưỡng cảnh báo, dưới 20 = nguy hiểm">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="bg" cx="60" cy="60" r="50" /><circle id="vtRing" class="fg" cx="60" cy="60" r="50" />
+      </svg>
+      <b id="vtScore">--</b><small>ĐIỂM NHIỆT</small>
     </div>
+    <p class="vt-slogan">Cùng nhau<br />phát triển<i>♡</i></p>
+  </section>
+
+  <section class="vt-tip" id="vtTip">
+    <figure class="vt-fig"><img id="vtNu" data-slot="nu" src="img/vt/nu-unknown.webp" alt="Nhân viên Việt Tâm" /></figure>
+    <div class="vt-tip-text">
+      <b>Lời khuyên cho bạn</b>
+      <p id="vtTipText">Chờ mình một chút nha!</p>
+    </div>
+    <button type="button" class="vt-primary" data-act="overlay" id="vtOverlay">Đồng hồ nổi góc màn hình</button>
+    <a href="#" class="vt-ghost" data-act="settings"><i>⚙</i><span><b>Cài đặt cảnh báo</b><small>Ngưỡng nhiệt, chu kỳ đo, nguồn đo</small></span><em>→</em></a>
   </section>
 
   <div id="alertBar" class="alert-bar" hidden></div>
@@ -134,7 +174,7 @@
     </div>
   </section>
 
-  <section class="bank">
+  <section class="bank" id="bankSection">
     <div class="bank-head">
       <h2><span>//</span> SENSOR ARRAY</h2>
       <small id="bankCount">0 sensors</small>

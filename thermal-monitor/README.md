@@ -61,10 +61,20 @@ Kết luận "tản nhiệt tốt/kém" chỉ đưa ra khi có số liệu tải
 - Nút **HUD / COCKPIT**: HUD là đồng hồ cơ tròn; COCKPIT là thanh đo dọc kiểu buồng lái máy bay, có con trỏ, dải vùng nhiệt và số đọc lớn.
 - Nút **◐ AUTO / ☾ ĐÊM / ☀ NGÀY**: AUTO tự đổi theo giờ (6:00–18:00 là ngày). Mặt đồng hồ luôn giữ nền tối như đồng hồ thật.
 
-### Giao diện Việt Tâm (có nhân vật)
-- Nút **VIỆT TÂM** trên thanh điều khiển chuyển sang giao diện của Công ty TNHH Thiết Bị Việt Tâm (bấm **THERMAL** để về giao diện gốc):
-  logo Việt Tâm ở tiêu đề và trên tab trình duyệt, tông xanh dương theo logo, cùng 2 nhân vật nam/nữ mặc đồng phục công ty
-  nói tình trạng máy bằng lời dễ hiểu.
+### Giao diện Việt Tâm (nổi khối 3D, có nhân vật)
+- Nút **VIỆT TÂM** trên thanh điều khiển chuyển sang giao diện của Công ty TNHH Thiết Bị Việt Tâm (về lại: menu trái →
+  *Công cụ nhanh* → **Giao diện Thermal Core**). Giao diện theo mẫu trang chủ nội bộ của công ty: nền sáng, thẻ trắng bo góc
+  nổi khối, nút dạng viên thuốc bóng, chữ tiêu đề Oswald, ngày tháng và khẩu hiệu "Cùng nhau phát triển" viết tay.
+- **Menu trái**: Tổng quan, Nhân CPU, Sức khoẻ ổ cứng, Nhật ký nhiệt độ, Tất cả cảm biến, Cài đặt cảnh báo (bấm để cuộn tới mục,
+  mục đang xem được tô sáng) và *Công cụ nhanh* (đồng hồ nổi, đổi °C/°F, xuất file chẩn đoán).
+- **Thanh trên**: chuông = còi cảnh báo quá nhiệt (vàng khi bật, số đỏ = số đồng hồ đang vượt ngưỡng), công tắc ngày/đêm
+  (bấm để đổi Tự động → Đêm → Ngày), tên máy và tên CPU.
+- **Thẻ chào**: nhân viên nam đổi tư thế theo nhiệt độ, nhận định tình trạng máy, điểm nhiệt. **Thanh lời khuyên**: nhân viên nữ
+  nhắc việc nên làm, nút bật đồng hồ nổi và lối tắt tới cài đặt cảnh báo.
+- **Đồng hồ đo kiểu mới**: đĩa nổi khối có mặt kính phản quang; vòng đo bóng màu **xanh = ổn định**, **cam = cao**,
+  **đỏ = quá nhiệt** (vành đỏ nhấp nháy); núm 3D ở đầu vòng đo; vạch vùng cảnh báo cam/đỏ phía ngoài; chấm xanh/cam là nhiệt độ
+  thấp nhất/cao nhất từ lúc mở app; số đo lớn ở tâm kèm xu hướng °C/phút.
+- Có chế độ đêm riêng (xanh đen, vẫn nổi khối). Font được đóng gói sẵn nên chạy không cần Internet.
 - Nhân vật đổi tư thế theo mức nhiệt (ảnh trong `web/img/vt/<nam|nu>-<mức>.webp`):
 
   | Mức nhiệt | Nam | Nữ |
@@ -243,6 +253,7 @@ Toàn bộ mã nguồn trong thư mục `thermal-monitor/` được viết riên
 | HWiNFO (tuỳ chọn, nguồn B) | Nhiệt độ mainboard | Freeware (không mã nguồn mở) | Người dùng tự cài; app chỉ đọc bộ nhớ chia sẻ |
 | Python, Tcl/Tk | Ngôn ngữ chạy app, cửa sổ overlay | PSF License, BSD-style | Đóng gói trong exe |
 | Pillow | Vẽ overlay | MIT-CMU | Đóng gói trong exe |
+| Oswald, Nunito, Dancing Script, Great Vibes | Font giao diện Việt Tâm (`web/fonts/`) | SIL Open Font License 1.1 | Đóng gói trong exe |
 | PyInstaller | Đóng gói exe | GPL-2.0 kèm ngoại lệ bootloader (cho phép phát hành exe theo giấy phép tuỳ ý) | Chỉ dùng lúc build |
 
 ## 9. Kiểm thử

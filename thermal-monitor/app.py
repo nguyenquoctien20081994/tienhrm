@@ -15,6 +15,7 @@ import mimetypes
 import os
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -29,7 +30,7 @@ import history
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.8.0"
 APP_AUTHOR = "Nguyễn Quốc Tiến"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
@@ -48,6 +49,12 @@ for _stream in (sys.stdout, sys.stderr):
         except (OSError, ValueError):
             pass
 
+
+# Kiểu file tĩnh cố định: trên Windows, mimetypes đọc registry và có máy gán .js = text/plain
+# -> trình duyệt chặn script vì header nosniff. Không phụ thuộc registry nữa.
+STATIC_TYPES = {".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".json": "application/json",
+                ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml", ".ico": "image/x-icon",
+                ".woff2": "font/woff2"}
 
 INTERVAL_CHOICES = (5, 6, 10, 15, 30, 60)
 SETTINGS_VERSION = 3  # 2: chu kỳ mặc định 15 s -> 6 s; 3: overlay trong suốt thêm 30%
@@ -386,7 +393,8 @@ def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_c
         def do_GET(self):  # noqa: N802
             path = urlparse(self.path).path
             if path == "/api/info":
-                return self._json(200, {"app": APP_NAME, "version": APP_VERSION, "author": APP_AUTHOR})
+                return self._json(200, {"app": APP_NAME, "version": APP_VERSION, "author": APP_AUTHOR,
+                                        "host": socket.gethostname()})
             if path == "/api/snapshot":
                 _, snap = sampler.wait_next(-1, 0)
                 return self._send(200, json.dumps(snap or {}).encode(), "application/json")
@@ -504,7 +512,8 @@ def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_c
             full = os.path.realpath(os.path.join(web_dir, rel))
             if not full.startswith(os.path.realpath(web_dir) + os.sep) or not os.path.isfile(full):
                 return self._send(404, b"Not found", "text/plain; charset=utf-8")
-            ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
+            ctype = STATIC_TYPES.get(os.path.splitext(full)[1].lower()) or mimetypes.guess_type(full)[0] \
+                or "application/octet-stream"
             if ctype.startswith("text/") or ctype in ("application/javascript", "application/json"):
                 ctype += "; charset=utf-8"
             with open(full, "rb") as f:

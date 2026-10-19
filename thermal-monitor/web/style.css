@@ -110,7 +110,7 @@ body {
 }
 .fx-vignette { background: radial-gradient(ellipse at center, transparent 55%, var(--vignette) 100%); z-index: 49; }
 
-body > *:not(.fx-grid):not(.fx-scan):not(.fx-vignette):not(.fx-sign):not(dialog) { position: relative; z-index: 1; }
+body > *:not(.fx-grid):not(.fx-scan):not(.fx-vignette):not(.fx-sign):not(.vt-side):not(dialog) { position: relative; z-index: 1; }
 
 /* ---------- Header ---------- */
 .hud-top {
@@ -318,10 +318,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
 }
 @media (max-width: 560px) {
   .brand h1 span { display: none; }
-  .brand-vt h1 span { display: inline; }
   .clock { display: none; }
   .hud-top > .right, .controls { flex-wrap: wrap; min-width: 0; }
-  .vt-logo { width: 40px; height: 40px; padding: 3px; }
 }
 
 .card[data-key="cpu"] { --accent: var(--acc-cpu); }
@@ -424,75 +422,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
 .diag-note { font-size: 12px !important; margin: 14px 0 0; }
 .diag-note a { color: var(--ui-accent); font-family: var(--font-mono); letter-spacing: 0.08em; }
 .settings-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-
-/* ---------- Giao diện Việt Tâm ---------- */
-/* Tông xanh dương – xám bánh răng theo logo Việt Tâm (#2294D2, #414244) và áo đồng phục. Màu riêng của
-   3 đồng hồ CPU/GPU/MAINBOARD giữ nguyên để người dùng không phải học lại. */
-:root[data-brand="viettam"] { --ui-accent: #3aa6ea; --grid-line: rgba(34, 148, 210, 0.07); }
-:root[data-brand="viettam"]:not([data-theme="day"]) {
-  --bg: #060c17;
-  --bg-glow: #0d2846;
-  --panel: rgba(10, 22, 40, 0.82);
-  --panel-2: rgba(14, 30, 54, 0.94);
-  --line: #1c3150;
-  --line-2: #2c4a72;
-  --muted: #8296b0;
-  --dialog: #081426;
-}
-/* Ban ngày: xanh đậm hơn để chữ đủ tương phản trên nền sáng */
-:root[data-brand="viettam"][data-theme="day"] { --ui-accent: #176fa8; --bg: #e9f1f8; --bg-glow: #ffffff; }
-.brand-vt, .vt-only { display: none; }
-:root[data-brand="viettam"] .brand-vt { display: flex; }
-:root[data-brand="viettam"] .vt-only { display: inline; }
-:root[data-brand="viettam"] .brand-thermal { display: none; }
-.vt-logo {
-  width: 54px; height: 54px; padding: 4px; flex: none; overflow: hidden;
-  border: 2px solid var(--ui-accent); border-radius: 50%; background: #f4f8fc;
-  box-shadow: 0 0 14px color-mix(in srgb, var(--ui-accent) 45%, transparent);
-}
-.vt-logo img { width: 100%; height: 100%; display: block; object-fit: contain; }
-
-.crew {
-  --lv: var(--muted);
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px;
-  margin: 0 0 14px; padding: 10px 14px 0;
-  border: 1px solid var(--line); border-bottom: 3px solid var(--lv);
-  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--lv) 10%, transparent)), var(--panel);
-}
-.crew[hidden] { display: none; }
-.mate { display: flex; align-items: flex-end; gap: 10px; min-width: 0; }
-.mate.right { justify-content: flex-end; }
-.fig { position: relative; margin: 0; width: 120px; height: 150px; flex: none; animation: bob 3.2s ease-in-out infinite; }
-.mate.right .fig { animation-delay: -1.6s; }
-.fig img { width: 100%; height: 100%; display: block; object-fit: contain; object-position: bottom; }
-.bubble {
-  position: relative; margin: 0 0 34px; padding: 10px 14px; max-width: 420px;
-  background: var(--panel-2); border: 1px solid color-mix(in srgb, var(--lv) 60%, var(--line-2)); border-radius: 14px;
-  color: var(--text-strong); font-size: 14px; line-height: 1.45; letter-spacing: 0.01em;
-}
-.bubble::after {
-  content: ""; position: absolute; bottom: 12px; width: 12px; height: 12px; background: var(--panel-2);
-  border: solid color-mix(in srgb, var(--lv) 60%, var(--line-2)); border-width: 0 0 1px 1px;
-}
-.mate:not(.right) .bubble::after { left: -7px; transform: rotate(45deg); }
-.mate.right .bubble::after { right: -7px; transform: rotate(-135deg); }
-@keyframes bob { 50% { transform: translateY(-4px); } }
-@keyframes shake { 25% { transform: translateX(-3px) rotate(-2deg); } 75% { transform: translateX(3px) rotate(2deg); } }
-.crew[data-level="critical"] .fig { animation: shake 0.35s linear infinite; }
-
-/* Ảnh thay thế do người dùng tải lên chỉ có 1 tư thế: thêm giọt mồ hôi khi máy nóng */
-.fig.has-img::after { content: ""; position: absolute; top: 8px; right: 6px; font-size: 22px; }
-.crew[data-level="hot"] .fig.has-img::after, .crew[data-level="critical"] .fig.has-img::after { content: "💦"; }
-
-@media (max-width: 760px) {
-  .crew { grid-template-columns: minmax(0, 1fr); }
-  .mate.right { justify-content: flex-start; }
-  .mate.right .fig { order: -1; }
-  .mate.right .bubble::after { left: -7px; right: auto; transform: rotate(45deg); }
-  .fig { width: 88px; height: 110px; }
-  .bubble { font-size: 13px; margin-bottom: 22px; }
-}
-@media (prefers-reduced-motion: reduce) { .fig, .crew[data-level="critical"] .fig { animation: none; } }
 
 /* Tải ảnh nhân vật / logo trong CALIBRATE */
 .brand-up { margin: 16px 0 0; padding: 10px 12px; border: 1px solid var(--line-2); }
