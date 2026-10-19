@@ -29,7 +29,7 @@ import history
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.4.1"
+APP_VERSION = "1.4.2"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
 FROZEN = getattr(sys, "frozen", False)
@@ -583,7 +583,8 @@ def main() -> None:
                 "os": platform.platform(), "python": sys.version.split()[0], "frozen": FROZEN,
                 "admin": winsupport.is_admin() if IS_WINDOWS else None,
                 "lhm_manager": None if manager is None else {"status": manager.status, "started_by_us": manager.started_by_us},
-                "settings": store.get(), "snapshot": sampler.latest, **sensors.diagnostics(provider)}
+                "settings": store.get(), "snapshot": sampler.latest, **sensors.diagnostics(provider),
+                "wmi": winsupport.wmi_temperature_scan() if IS_WINDOWS else None}
 
     # Chỉ lắng nghe 127.0.0.1: máy khác trong mạng không truy cập được.
     try:

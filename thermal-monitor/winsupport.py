@@ -204,6 +204,32 @@ class LhmManager:
             stop_lhm()
 
 
+# --------------------------------------------------------------------------- chẩn đoán
+
+_WMI_SCAN = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+$r = [ordered]@{}
+$r.wmi_thermal_classes = @(Get-CimClass -Namespace root/wmi | Where-Object { $_.CimClassName -match 'Therm|Temp|Fan|Lenovo' } | ForEach-Object CimClassName)
+$r.root_namespaces = @(Get-CimInstance -Namespace root -ClassName __NAMESPACE | ForEach-Object Name)
+$r.temperature_probe = @(Get-CimInstance Win32_TemperatureProbe | Select-Object Name, CurrentReading, Status)
+$r.fans = @(Get-CimInstance Win32_Fan | Select-Object Name, Status)
+$r.baseboard = Get-CimInstance Win32_BaseBoard | Select-Object Manufacturer, Product, Version
+$r | ConvertTo-Json -Compress -Depth 4
+"""
+
+
+def wmi_temperature_scan() -> dict:
+    """Liệt kê các nguồn nhiệt độ Windows/WMI có sẵn (chỉ đọc) – để tìm đường đọc nhiệt mainboard khác LHM."""
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", _WMI_SCAN],
+                           capture_output=True, text=True, timeout=40, creationflags=_NO_WINDOW)
+        import json
+
+        return json.loads(r.stdout or "{}")
+    except Exception as exc:  # noqa: BLE001 - chỉ phục vụ chẩn đoán
+        return {"error": str(exc)}
+
+
 # --------------------------------------------------------------------------- mở giao diện
 
 def find_browser() -> str | None:

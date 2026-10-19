@@ -307,11 +307,11 @@ def parse_lhm(root: dict) -> tuple[list[Sensor], dict]:
         metrics["cpu_clock"] = round(sum(clocks) / len(clocks))
         metrics["cpu_clock_max"] = round(max(clocks))  # nhân nhanh nhất – dùng để nhận biết hạ xung
     # Từng nhân: nhiệt độ + tải + xung. Tải được đặt tên theo số thứ tự nhân ("CPU Core #k Thread #m")
-    # còn nhiệt độ/xung có thể là "P-Core #1"/"E-Core #1" -> ghép theo chỉ số trong SensorId.
+    # còn nhiệt độ/xung có thể là "P-Core #1"/"E-Core #1" -> ghép theo THỨ TỰ nhân (LHM liệt kê cùng thứ tự).
+    # Không dùng chỉ số trong SensorId: "Core Max"/"Core Average" có thể đứng trước và làm lệch chỉ số.
     cores = []
     for pos, s in enumerate(x for x in sensors if x.category == "cpu" and _CORE_RE.match(x.name.lower())):
-        m = re.search(r"/temperature/(\d+)$", s.id)
-        k = int(m.group(1)) + 1 if m else pos + 1
+        k = pos + 1
         loads = core_load.get(k)
         cores.append({"name": s.name, "temp": s.value,
                       "load": round(sum(loads) / len(loads), 1) if loads else None,

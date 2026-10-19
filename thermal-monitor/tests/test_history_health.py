@@ -127,6 +127,31 @@ class DriveHealth(unittest.TestCase):
         self.assertTrue(tips)
 
 
+class RealM910qData(unittest.TestCase):
+    """data.json thật từ ThinkCentre M910q (LHM 0.9.6, RawValue dạng chuỗi có đơn vị)."""
+
+    def setUp(self):
+        with open(os.path.join(FIX, "lhm_m910q_real_0.9.6.json"), encoding="utf-8") as f:
+            self.sensors, self.m = sensors.parse_lhm(json.load(f))
+
+    def test_core_loads_follow_core_order(self):
+        # "Core Max"/"Core Average" đứng trước các nhân trong LHM -> không được làm lệch tải từng nhân
+        self.assertEqual([c["name"] for c in self.m["cores"]], [f"CPU Core #{i}" for i in range(1, 5)])
+        self.assertEqual([c["load"] for c in self.m["cores"]], [56.3, 53.1, 51.6, 48.4])
+        self.assertEqual([c["temp"] for c in self.m["cores"]], [43.0, 44.0, 42.0, 43.0])
+
+    def test_values_parsed_from_string_raw(self):
+        by = {s.id: s for s in self.sensors}
+        self.assertEqual(by["/intelcpu/0/temperature/6"].value, 44.0)
+        nvme = by["/nvme/0/temperature/0"]
+        self.assertEqual((nvme.value, nvme.warn, nvme.crit), (36.0, 83.0, 87.0))
+        self.assertEqual((self.m["tjmax"], self.m["cpu_load"], self.m["drives"][0]["life"]), (100, 52.3, 98.0))
+
+    def test_no_superio_board_uses_ssd(self):
+        self.assertFalse(any(s.category == "board" for s in self.sensors))
+        self.assertEqual(sensors.pick_primary(self.sensors)["board"], "/nvme/0/temperature/0")
+
+
 class NewSettings(unittest.TestCase):
     def test_validation(self):
         self.assertEqual(app.validate_settings_patch({"history_days": 14, "ui": {"style": "cockpit", "theme": "day"}}),
