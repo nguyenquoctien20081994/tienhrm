@@ -27,12 +27,22 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover -s tests -v
 
-      - name: Install PyInstaller
+      - name: Install PyInstaller (bootloader compiled from source)
+        env:
+          PYINSTALLER_COMPILE_BOOTLOADER: "1"
         run: |
-          # Tự biên dịch bootloader để giảm cảnh báo nhầm của phần mềm diệt virus; lỗi thì dùng bản dựng sẵn
+          # Tự biên dịch bootloader (MSVC có sẵn trên runner) để giảm cảnh báo nhầm của phần mềm diệt virus;
+          # nếu biên dịch lỗi thì dùng bootloader dựng sẵn.
           python -m pip install --upgrade pip wheel
-          python -m pip install --no-binary pyinstaller "pyinstaller==6.11.1"
-          if ($LASTEXITCODE -ne 0) { python -m pip install "pyinstaller==6.11.1" }
+          python -m pip install -v --no-cache-dir --no-binary pyinstaller "pyinstaller==6.11.1" 2>&1 |
+            Select-String -Pattern 'bootloader|waf|cl\.exe|error' | Select-Object -Last 15
+          if ($LASTEXITCODE -ne 0 -or -not (python -m PyInstaller --version)) {
+            Write-Host "::warning::Bootloader compile failed - using prebuilt PyInstaller"
+            python -m pip install --force-reinstall "pyinstaller==6.11.1"
+          }
+          $boot = python -c "import PyInstaller, os; print(os.path.join(os.path.dirname(PyInstaller.__file__), 'bootloader', 'Windows-64bit-intel', 'runw.exe'))"
+          Write-Host "Bootloader: $boot"
+          (Get-Item $boot).LastWriteTime
 
       - name: Build ThermalCoreHUD.exe
         run: >
