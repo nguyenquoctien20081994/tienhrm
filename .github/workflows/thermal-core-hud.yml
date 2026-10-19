@@ -31,8 +31,7 @@ jobs:
         run: python -m unittest discover -s tests -v
 
       - name: HWiNFO reader on real Windows (no HWiNFO installed -> clean "not found")
-        run: |
-          python -c "import hwinfo; exec('try:\n hwinfo.read_shared_memory(); print(\'unexpected: HWiNFO present\')\nexcept hwinfo.HwinfoUnavailable as e:\n print(\'OK:\', e)')"
+        run: python hwinfo.py
 
       - name: Install PyInstaller (bootloader compiled from source)
         env:

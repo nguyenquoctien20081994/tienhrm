@@ -122,3 +122,12 @@ def temperatures(data: dict) -> list[dict]:
 def is_stale(data: dict, max_age: float = 60) -> bool:
     """HWiNFO bị treo/tạm dừng: lần cập nhật cuối quá cũ."""
     return data.get("poll_time", 0) > 0 and time.time() - data["poll_time"] > max_age
+
+
+if __name__ == "__main__":  # kiểm tra nhanh: python hwinfo.py
+    try:
+        d = parse(read_shared_memory())
+        for t in temperatures(d):
+            print(f"{t['device']} | {t['label']} = {t['value']:.1f}°C")
+    except HwinfoUnavailable as exc:  # không có HWiNFO là trạng thái hợp lệ
+        print("HWiNFO không khả dụng:", exc)
