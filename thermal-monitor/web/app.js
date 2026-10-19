@@ -479,7 +479,9 @@
   function applySnapshot(snap, fromPicker = false) {
     state.snap = snap;
     const now = performance.now();
-    if (!fromPicker) { state.lastDataAt = now; state.lastDataWall = Date.now(); }
+    // Snapshot gửi lại (vd. overlay vừa bật/tắt) có cùng mốc ts -> không tính là lần đo mới
+    const fresh = !fromPicker && snap.ts !== state.prevTs;
+    if (fresh) { state.prevTs = snap.ts; state.lastDataAt = now; state.lastDataWall = Date.now(); }
     rebuildPickers(snap);
 
     for (const g of gauges) {
@@ -495,7 +497,7 @@
       const hw = s ? `${substitute}${s.name} · ${s.hardware}` : "Không có cảm biến – chọn cảm biến khác ở menu phía trên";
       $(".hw", g.el).textContent = hw;
       $(".hw", g.el).title = hw;
-      if (g.target != null && !fromPicker) {
+      if (g.target != null && fresh) {
         g.hist.push({ t: Date.now(), v: g.target });
         const cut = Date.now() - HISTORY_SEC * 1000;
         while (g.hist.length && g.hist[0].t < cut) g.hist.shift();
@@ -722,7 +724,7 @@
       for (const k in st) st[k] += (tg[k] - st[k]) * (k === "cpu" ? 0.35 : 0.12) + (Math.random() - 0.5) * 1.2;
       const r = (v) => Math.round(v * 10) / 10;
       applySnapshot({
-        mode: "demo", source: "Browser simulator", interval: 1, readMs: 0, messages: [reason],
+        ts: Date.now() / 1000, mode: "demo", source: "Browser simulator", interval: 1, readMs: 0, messages: [reason],
         sensors: [
           { id: "d/cpu", name: "CPU Package", hardware: "Simulated CPU", category: "cpu", value: r(st.cpu) },
           { id: "d/gpu", name: "GPU Core", hardware: "Simulated GPU", category: "gpu", value: r(st.gpu) },

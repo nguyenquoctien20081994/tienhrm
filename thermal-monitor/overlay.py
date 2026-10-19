@@ -263,6 +263,7 @@ class OverlayController:
         self.win = None
         self.visible = False
         self.ever_shown = False
+        self.on_change = None  # gọi khi overlay bật/tắt
         self.renderer = None
         self.render_key = None
         self.anim = {}
@@ -323,6 +324,8 @@ class OverlayController:
         self.visible = True
         self.ever_shown = True
         self.settings.update({"overlay": {"enabled": True}})
+        if self.on_change:
+            self.on_change()
         self._tick()
 
     def hide(self) -> None:
@@ -330,6 +333,8 @@ class OverlayController:
             self.win.withdraw()
         self.visible = False
         self.settings.update({"overlay": {"enabled": False}})
+        if self.on_change:
+            self.on_change()
 
     def _ensure_renderer(self) -> None:
         key = self._settings_key()

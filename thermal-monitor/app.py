@@ -232,6 +232,18 @@ class Sampler:
             self.wake.wait(max(0.05, interval - (time.monotonic() - started)))
             self.wake.clear()
 
+    def republish(self) -> None:
+        """Gửi lại snapshot gần nhất với trạng thái mới (vd. overlay vừa bật/tắt) mà không chờ chu kỳ đo."""
+        with self.cond:
+            if self.latest is None:
+                return
+            snap = dict(self.latest)
+            if self.extra_fn:
+                snap.update(self.extra_fn())
+            self.latest = snap
+            self.seq += 1
+            self.cond.notify_all()
+
     def wait_next(self, last_seq: int, timeout: float) -> tuple[int, dict | None]:
         with self.cond:
             self.cond.wait_for(lambda: self.seq != last_seq, timeout=timeout)
@@ -488,6 +500,8 @@ def main() -> None:
     sampler = Sampler(provider, interval, store.get, status_fn=(lambda: manager.status) if manager else None,
                       extra_fn=lambda: {"overlay": None if ctl is None else ctl.visible})
     store.listeners.append(lambda patch: "interval" in patch and sampler.wake.set())  # đo lại ngay theo chu kỳ mới
+    if ctl is not None:
+        ctl.on_change = sampler.republish  # nút OVERLAY trên giao diện cập nhật ngay
     sampler.start()
 
     # Chỉ lắng nghe 127.0.0.1: máy khác trong mạng không truy cập được.
