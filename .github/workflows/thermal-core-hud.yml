@@ -18,9 +18,9 @@ jobs:
         shell: pwsh
         working-directory: thermal-monitor
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -49,7 +49,7 @@ jobs:
             try { $s = Invoke-RestMethod http://127.0.0.1:8790/api/snapshot; $ok = $s.mode -eq 'demo' -and $s.sensors.Count -gt 0 } catch {}
           }
           $html = (Invoke-WebRequest http://127.0.0.1:8790/ -UseBasicParsing).Content
-          Stop-Process -Id $p.Id -Force
+          taskkill /PID $p.Id /T /F | Out-Null   # exe một file = 2 tiến trình (bootloader + app)
           if (-not $ok -or $html -notmatch 'THERMAL') { throw 'Demo smoke test failed' }
           Write-Host "Demo OK: $($s.sensors.Count) sensors, version $($s.version)"
 
@@ -62,13 +62,17 @@ jobs:
             Start-Sleep 1
             $ok = (Test-Path "$lhm/LibreHardwareMonitor.exe") -and (Test-Path "$lhm/LibreHardwareMonitor.config")
           }
-          Start-Sleep 5
-          $s = Invoke-RestMethod http://127.0.0.1:8791/api/snapshot
+          # Máy build không có người bấm hộp thoại cài PawnIO của LHM, nên LHM có thể không trả dữ liệu:
+          # chỉ ghi log, không coi là lỗi.
+          for ($i = 0; $i -lt 30; $i++) {
+            Start-Sleep 1
+            try { $s = Invoke-RestMethod http://127.0.0.1:8791/api/snapshot; if ($s.sensors.Count -gt 0) { break } } catch {}
+          }
           Write-Host "Source: $($s.source) | mode: $($s.mode) | sensors: $($s.sensors.Count)"
           $s.messages | ForEach-Object { Write-Host "  ! $_" }
           $s.sensors | ForEach-Object { Write-Host "  - [$($_.category)] $($_.name) = $($_.value) ($($_.hardware))" }
           Get-Content "$lhm/LibreHardwareMonitor.config"
-          Stop-Process -Id $p.Id -Force
+          taskkill /PID $p.Id /T /F | Out-Null
           Get-Process LibreHardwareMonitor -ErrorAction SilentlyContinue | Stop-Process -Force
           if (-not $ok) { throw 'LibreHardwareMonitor was not installed/configured' }
 
@@ -76,7 +80,7 @@ jobs:
         id: meta
         run: |
           $hash = (Get-FileHash dist/ThermalCoreHUD.exe -Algorithm SHA256).Hash
-          $ver = python -c "import re;print(re.search(r'APP_VERSION = \"(.+?)\"', open('app.py', encoding='utf-8').read()).group(1))"
+          $ver = (Select-String -Path app.py -Pattern 'APP_VERSION = "(.+?)"').Matches[0].Groups[1].Value
           "$hash  ThermalCoreHUD.exe" | Out-File dist/ThermalCoreHUD.exe.sha256 -Encoding ascii
           "sha256=$hash" >> $env:GITHUB_OUTPUT
           "version=$ver" >> $env:GITHUB_OUTPUT

@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
@@ -21,6 +22,7 @@ LHM_URL = ("https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/release
            f"{LHM_VERSION}/LibreHardwareMonitor.zip")
 LHM_SHA256 = "086d9f1b5a99e643edc2cfaaac16051685b551e4c5ac0b32a57c58c0e529c001"
 LHM_EXE = "LibreHardwareMonitor.exe"
+LHM_DATA_URL = "http://127.0.0.1:8085/data.json"
 
 # Khoá cấu hình của LibreHardwareMonitor (file LibreHardwareMonitor.config cạnh exe)
 LHM_SETTINGS = {
@@ -163,10 +165,26 @@ class LhmManager:
                 subprocess.Popen([exe], cwd=folder)
                 self.started_by_us = True
                 self.log("Đã khởi động LibreHardwareMonitor.")
+            self._wait_web_server()
             self.status = None
         except Exception as exc:  # noqa: BLE001 - báo lỗi lên giao diện, không làm sập app
             self.status = f"Không chuẩn bị được LibreHardwareMonitor: {exc}"
             self.log(self.status)
+
+    def _wait_web_server(self, timeout: float = 45) -> None:
+        """LHM mất vài giây để quét phần cứng (lần đầu còn hỏi cài PawnIO) -> chờ web server sẵn sàng."""
+        self.status = ("Đang khởi động LibreHardwareMonitor... Nếu được hỏi "
+                       "\"PawnIO is not installed, do you want to install it?\" hãy bấm OK.")
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                with urllib.request.urlopen(LHM_DATA_URL, timeout=2) as resp:
+                    if resp.status == 200:
+                        return
+            except OSError:
+                pass
+            time.sleep(1)
+        self.log("LibreHardwareMonitor chưa phản hồi sau 45 giây.")
 
     @staticmethod
     def _config_ok(path: str) -> bool:
