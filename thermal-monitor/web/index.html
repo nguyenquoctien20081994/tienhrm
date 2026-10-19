@@ -126,7 +126,7 @@
       <p>Ngưỡng cảnh báo theo °C. Vượt ngưỡng <b class="amber">WARN</b> thẻ chuyển cam, vượt <b class="red">CRIT</b> báo động đỏ.</p>
       <label class="settings-interval">Chu kỳ đo nhiệt độ
         <select id="selInterval">
-          <option value="5">5 giây</option><option value="10">10 giây</option><option value="15">15 giây (khuyên dùng)</option>
+          <option value="5">5 giây</option><option value="6">6 giây (khuyên dùng)</option><option value="10">10 giây</option><option value="15">15 giây</option>
           <option value="30">30 giây</option><option value="60">60 giây</option>
         </select>
       </label>
@@ -136,6 +136,8 @@
         </select>
       </label>
       <div id="settingsRows" class="settings-rows"></div>
+      <p class="diag-note">Thiếu cảm biến (vd. nhiệt độ mainboard)? Bấm <a id="lnkDiag" href="api/diagnostics" download>XUẤT FILE CHẨN ĐOÁN</a>
+        rồi gửi file vừa tải về cho người hỗ trợ – file chỉ chứa thông tin phần cứng và số đo.</p>
       <div class="settings-actions">
         <button type="button" id="btnReset">MẶC ĐỊNH</button>
         <button type="submit" value="save" class="primary">LƯU</button>

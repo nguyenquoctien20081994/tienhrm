@@ -403,4 +403,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
 .settings input { width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); padding: 6px; font-family: var(--font-mono); }
 .settings-interval { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 14px; font-size: 13px; }
 .settings-interval select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); padding: 6px; font-family: var(--font-mono); }
+.diag-note { font-size: 12px !important; margin: 14px 0 0; }
+.diag-note a { color: var(--cyan); font-family: var(--font-mono); letter-spacing: 0.08em; }
 .settings-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }

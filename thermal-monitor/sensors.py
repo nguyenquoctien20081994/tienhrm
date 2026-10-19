@@ -78,10 +78,11 @@ def pick_primary(sensors: list[Sensor]) -> dict[str, str | None]:
     result: dict[str, str | None] = {}
     for cat in ("cpu", "gpu", "board"):
         cands = [s for s in sensors if s.category == cat]
-        if cat == "board" and not cands:
+        if cat == "board" and not any(s.value is not None for s in cands):
+            # Không có cảm biến mainboard, hoặc có nhưng chỉ trả về giá trị rác (0°C...)
             # Laptop (vd. ThinkPad) không có chip SuperIO và ACPI có thể bị khoá ->
             # dùng nhiệt độ SSD NVMe (nằm trên mainboard) làm nguồn thay thế; giao diện ghi rõ "thay thế".
-            cands = [s for s in sensors if s.category == "storage"]
+            cands = [s for s in sensors if s.category == "storage" and s.value is not None] or cands
         if cat == "gpu":
             # Ưu tiên GPU rời; nếu GPU rời đang ngủ (không có giá trị) thì vẫn giữ nó
             # để giao diện hiển thị trạng thái SLEEP thay vì nhảy sang GPU khác.
@@ -172,7 +173,10 @@ _UNIT_TYPES = [("°C", "temperature"), ("°F", "temperature"), ("%", "load"), ("
                ("MHz", "clock"), ("GHz", "clock"), (" W", "power")]
 # Ổ cứng công bố ngưỡng cố định dưới dạng "cảm biến" nhiệt độ -> không phải nhiệt độ đo được
 _LIMIT_RE = re.compile(r"warning temperature|critical temperature|threshold|temperature limit", re.I)
-TEMP_VALID = (-30.0, 150.0)  # ngoài khoảng này coi như cảm biến lỗi
+# Ngoài khoảng này coi như cảm biến lỗi/kênh không dùng. 0°C là giá trị "trống" phổ biến của chip
+# giám sát mainboard (SuperIO); 125–128°C cũng là mã "không có cảm biến" -> mainboard giới hạn chặt hơn.
+TEMP_VALID = (0.0, 150.0)
+TEMP_VALID_BOARD = (0.0, 125.0)
 _CORE_RE = re.compile(r"^((cpu |p-|e-)?core)( #?\d+)?$")  # "CPU Core #1", "P-Core #2", "Core 0" (Linux)
 # (loại, tên cảm biến LHM) -> trường sức khoẻ ổ đĩa
 _DRIVE_FIELDS = {
@@ -197,8 +201,9 @@ def _num(node: dict, key: str) -> float | None:
     return float(m.group(0).replace(",", ".")) if m else None
 
 
-def _plausible(v: float | None) -> float | None:
-    return v if v is not None and TEMP_VALID[0] < v < TEMP_VALID[1] else None
+def _plausible(v: float | None, category: str = "") -> float | None:
+    lo, hi = TEMP_VALID_BOARD if category == "board" else TEMP_VALID
+    return v if v is not None and lo < v < hi else None
 
 
 def _leaf_type(node: dict) -> str:
@@ -261,9 +266,9 @@ def parse_lhm(root: dict) -> tuple[list[Sensor], dict]:
         sid = node.get("SensorId") or f"lhm:{hardware}/{name}"
         sensors.append(Sensor(
             id=str(sid), name=name, hardware=hardware, category=category,
-            value=_round(_plausible(_raw_or_text(node, "Value"))),
-            min=_round(_plausible(_raw_or_text(node, "Min"))),
-            max=_round(_plausible(_raw_or_text(node, "Max"))),
+            value=_round(_plausible(_raw_or_text(node, "Value"), category)),
+            min=_round(_plausible(_raw_or_text(node, "Min"), category)),
+            max=_round(_plausible(_raw_or_text(node, "Max"), category)),
         ))
     for s in sensors:
         lim = limits.get(s.hardware)
@@ -341,11 +346,13 @@ class LhmHttpProvider:
         if auth:
             self.headers["Authorization"] = "Basic " + base64.b64encode(auth.encode()).decode()
 
-    def read(self) -> tuple[list[Sensor], dict]:
+    def read_raw(self) -> dict:
         req = urllib.request.Request(self.url, headers=self.headers)
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8-sig"))
-        return parse_lhm(data)
+            return json.loads(resp.read().decode("utf-8-sig"))
+
+    def read(self) -> tuple[list[Sensor], dict]:
+        return parse_lhm(self.read_raw())
 
 
 # ---------------------------------------------------------------------------
@@ -658,6 +665,25 @@ class AutoProvider:
             messages.append("Chưa đọc được cảm biến nhiệt độ nào trên máy này.")
         return Reading(sensors=sensors, source=" + ".join(sources) or "—", mode=mode, messages=messages,
                        metrics=metrics)
+
+
+def diagnostics(provider) -> dict:
+    """Dữ liệu thô để chẩn đoán vì sao thiếu cảm biến (vd. LHM có nhận ra chip mainboard không)."""
+    out: dict = {"provider": type(provider).__name__}
+    lhm = getattr(provider, "lhm", None)
+    if lhm is not None:
+        out["lhm_url"] = lhm.url
+        try:
+            out["lhm_data"] = lhm.read_raw()
+        except Exception as exc:  # noqa: BLE001 - ghi lại lỗi để chẩn đoán
+            out["lhm_error"] = str(exc)
+    acpi = getattr(provider, "acpi", None)
+    if acpi is not None:
+        out["acpi"] = {"values": [asdict(s) for s in acpi.read()], "error": acpi.error}
+    hwmon = getattr(provider, "hwmon", None)
+    if hwmon is not None:
+        out["hwmon"] = [asdict(s) for s in hwmon.read()]
+    return out
 
 
 class DemoAuto:

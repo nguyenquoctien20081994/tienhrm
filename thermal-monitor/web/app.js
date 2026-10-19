@@ -24,7 +24,7 @@
 
   const settings = {
     unit: store.get("unit", "C"),
-    interval: 15,
+    interval: 6,
     historyDays: 30,
     ui: store.get("ui", { style: "hud", theme: "auto" }),
     sound: false,
@@ -51,7 +51,7 @@
       if (!r.ok) return;
       const s = await r.json();
       settings.unit = s.unit === "F" ? "F" : "C";
-      settings.interval = s.interval || 15;
+      settings.interval = s.interval || 6;
       settings.historyDays = s.history_days || 30;
       settings.ui = { style: "hud", theme: "auto", ...(s.ui || {}) };
       store.set("ui", settings.ui);
@@ -945,7 +945,7 @@
       settings.thresholds[g.key] = { warn: g.warn, crit: g.crit };
     }
     store.set("thresholds", settings.thresholds);
-    settings.interval = Number($("#selInterval").value) || 15;
+    settings.interval = Number($("#selInterval").value) || 6;
     settings.historyDays = Number($("#selHistory").value) || 30;
     saveServer({ thresholds: settings.thresholds, interval: settings.interval, history_days: settings.historyDays });
     document.dispatchEvent(new CustomEvent("tch:settings"));

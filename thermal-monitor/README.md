@@ -1,6 +1,6 @@
 # Thermal Core HUD
 
-App chạy local trên máy tính, đo **nhiệt độ CPU, GPU, Mainboard, ổ cứng** (mặc định 15 giây/lần, chỉnh được 5–60 giây), có **thanh nhận định bằng lời** cho người không chuyên, giao diện đồng hồ cơ kết hợp HUD gaming/viễn tưởng.
+App chạy local trên máy tính, đo **nhiệt độ CPU, GPU, Mainboard, ổ cứng** (mặc định 6 giây/lần, chỉnh được 5–60 giây), có **thanh nhận định bằng lời** cho người không chuyên, giao diện đồng hồ cơ kết hợp HUD gaming/viễn tưởng.
 
 Bản này được chỉnh cho **ThinkPad X1 Yoga Gen 5 · Intel Core i7-10610U · Intel UHD Graphics · Windows 11 Pro 25H2**, và vẫn chạy được trên các máy Windows/Linux khác.
 
@@ -97,7 +97,7 @@ LibreHardwareMonitor không báo trực tiếp trạng thái hạ xung, nên app
 
 ### Overlay – 3 đồng hồ nổi ở góc trên bên phải màn hình
 
-Bấm nút **OVERLAY** trên thanh công cụ (hoặc chạy `ThermalCoreHUD.exe --overlay` để chỉ mở overlay). Overlay là cửa sổ không viền, trong suốt mờ và **luôn nằm trên mọi app khác**:
+Bấm nút **OVERLAY** trên thanh công cụ (hoặc chạy `ThermalCoreHUD.exe --overlay` để chỉ mở overlay). Overlay là cửa sổ không viền, trong suốt mờ (mặc định đậm 55%, cuộn chuột để chỉnh) và **luôn nằm trên mọi app khác**:
 
 | Thao tác | Kết quả |
 |---|---|
@@ -129,7 +129,7 @@ ThermalCoreHUD.exe (hoặc python app.py)
     [--ui auto|window|browser|none] [--overlay] [--keep-running] [--version]
 ```
 
-- `--interval`: chu kỳ đo cho phiên này (mặc định lấy theo cài đặt, 15 giây; đổi lâu dài trong **CALIBRATE**).
+- `--interval`: chu kỳ đo cho phiên này (mặc định lấy theo cài đặt, 6 giây; đổi lâu dài trong **CALIBRATE**).
 - `--overlay`: chỉ hiện overlay 3 đồng hồ, không mở cửa sổ chính. Có thể tạo shortcut với tham số này và đặt vào thư mục Startup (`Win + R` → `shell:startup`) để overlay tự bật khi khởi động máy.
 
 - `--no-manage-lhm`: không tự tải/bật LibreHardwareMonitor (khi anh tự quản lý LHM).
@@ -144,7 +144,7 @@ ThermalCoreHUD.exe (UAC admin) ─ tự tải, cấu hình, khởi động ─�
 LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
       │  http://127.0.0.1:8085/data.json         │ PowerShell, 5 giây/lần
       ▼                                          ▼
- app.py ── Sampler (luồng nền, 15 giây/lần) ── sensors.py + assess.py (nhận định)
+ app.py ── Sampler (luồng nền, 6 giây/lần) ── sensors.py + assess.py (nhận định)
       │  Server-Sent Events /api/stream  (chỉ lắng nghe 127.0.0.1)
       ▼
  web/  (HTML + Canvas, không dùng thư viện ngoài, chạy được khi không có mạng)
@@ -158,6 +158,8 @@ LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
 
 ## 6. Xử lý sự cố
 
+> **Thiếu nhiệt độ mainboard?** Mở **CALIBRATE → XUẤT FILE CHẨN ĐOÁN** và gửi file `thermalcore-chan-doan-….json` cho người hỗ trợ: file cho biết LibreHardwareMonitor có nhận ra chip giám sát mainboard (SuperIO, ví dụ Nuvoton NCT6683D) hay không. Nếu chip có mặt nhưng chỉ trả về 0°C / ≥125°C (kênh không dùng), app tự bỏ qua và dùng nguồn thay thế.
+>
 > **Lenovo ThinkCentre M910q (và nhiều máy mini/văn phòng):** LibreHardwareMonitor không đọc được cảm biến mainboard của dòng này (không hỗ trợ chip giám sát của Lenovo, không có nhiệt độ PCH). App tự dùng nhiệt độ ổ SSD (nằm trên mainboard) và ghi nhãn **THAY THẾ**. Đây là giới hạn phần cứng/driver, không phải lỗi app.
 >
 > Bản ≤ 1.2 hiển thị ổ cứng **87°C đứng yên**: đó là *ngưỡng cảnh báo* (Warning/Critical Temperature) của ổ bị hiểu nhầm là nhiệt độ. Bản 1.3 đã tách ra và dùng nó làm ngưỡng cảnh báo riêng cho từng ổ.

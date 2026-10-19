@@ -29,7 +29,7 @@ import history
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.4.1"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
 FROZEN = getattr(sys, "frozen", False)
@@ -48,20 +48,22 @@ for _stream in (sys.stdout, sys.stderr):
             pass
 
 
-INTERVAL_CHOICES = (5, 10, 15, 30, 60)
+INTERVAL_CHOICES = (5, 6, 10, 15, 30, 60)
+SETTINGS_VERSION = 3  # 2: chu kỳ mặc định 15 s -> 6 s; 3: overlay trong suốt thêm 30%
 HISTORY_DAY_CHOICES = (7, 14, 30)
 UI_STYLES = ("hud", "cockpit")
 UI_THEMES = ("auto", "night", "day")
 DEFAULT_SETTINGS = {
     "unit": "C",
-    "interval": 15,  # giây giữa 2 lần đọc cảm biến
+    "settings_version": SETTINGS_VERSION,
+    "interval": 6,  # giây giữa 2 lần đọc cảm biến
     "history_days": 30,  # số ngày giữ nhật ký nhiệt độ
     "ui": {"style": "hud", "theme": "auto"},  # đồng hồ cơ / buồng lái; ngày / đêm / tự động theo giờ
     # Ngưỡng cho ThinkPad X1 Yoga Gen 5 (i7-10610U, TjMax 100 °C; iGPU chung đế với CPU)
     "thresholds": {"cpu": {"warn": 85, "crit": 95}, "gpu": {"warn": 85, "crit": 95},
                    "board": {"warn": 65, "crit": 80}},
     "picks": {},
-    "overlay": {"enabled": False, "opacity": 0.85, "x": None, "y": None},
+    "overlay": {"enabled": False, "opacity": 0.55, "x": None, "y": None},
 }
 GAUGE_KEYS = ("cpu", "gpu", "board")
 
@@ -150,6 +152,15 @@ class SettingsStore:
                     loaded = json.load(f)
                 if isinstance(loaded, dict):
                     _deep_merge(self.data, {k: v for k, v in loaded.items() if k in DEFAULT_SETTINGS})
+                    # Bản ≤ 1.4 lưu sẵn chu kỳ mặc định cũ (15 s) -> chuyển sang mặc định mới 6 s
+                    version = loaded.get("settings_version", 1)
+                    if version < 2 and loaded.get("interval") == 15:
+                        self.data["interval"] = 6
+                    saved_opacity = (loaded.get("overlay") or {}).get("opacity")
+                    if version < 3 and isinstance(saved_opacity, (int, float)):
+                        # Overlay trong suốt thêm 30% so với độ đang dùng (tối thiểu 25% độ đậm)
+                        self.data["overlay"]["opacity"] = max(0.25, round(saved_opacity - 0.30, 2))
+                    self.data["settings_version"] = SETTINGS_VERSION
             except (OSError, ValueError) as exc:
                 print("Không đọc được settings.json, dùng mặc định:", exc)
         self.listeners: list = []
@@ -288,7 +299,7 @@ class Sampler:
                 self.idle_since = time.monotonic()
 
 
-def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_ctl=None, db=None):
+def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_ctl=None, db=None, diag_fn=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = f"{APP_NAME}/{APP_VERSION}"
 
@@ -315,6 +326,17 @@ def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_c
                 return self._stream()
             if path == "/api/settings":
                 return self._json(200, store.get())
+            if path == "/api/diagnostics":
+                body = json.dumps(diag_fn() if diag_fn else {}, ensure_ascii=False, indent=1, default=str).encode()
+                name = time.strftime("thermalcore-chan-doan-%Y%m%d-%H%M.json")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="{name}"')
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+                return
             if path in ("/api/history", "/api/report"):
                 if db is None:
                     return self._json(409, {"error": "nhật ký không khả dụng"})
@@ -554,9 +576,18 @@ def main() -> None:
         ctl.on_change = sampler.republish  # nút OVERLAY trên giao diện cập nhật ngay
     sampler.start()
 
+    def diag_fn() -> dict:
+        import platform
+
+        return {"app": APP_NAME, "version": APP_VERSION, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "os": platform.platform(), "python": sys.version.split()[0], "frozen": FROZEN,
+                "admin": winsupport.is_admin() if IS_WINDOWS else None,
+                "lhm_manager": None if manager is None else {"status": manager.status, "started_by_us": manager.started_by_us},
+                "settings": store.get(), "snapshot": sampler.latest, **sensors.diagnostics(provider)}
+
     # Chỉ lắng nghe 127.0.0.1: máy khác trong mạng không truy cập được.
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(sampler, resource_dir(), store, ctl, db))
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(sampler, resource_dir(), store, ctl, db, diag_fn))
     except OSError as exc:
         fatal(f"Không mở được cổng {args.port} ({exc}). Hãy đóng ứng dụng đang dùng cổng này "
               f"hoặc chạy với tham số --port khác.")

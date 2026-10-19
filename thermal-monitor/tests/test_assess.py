@@ -116,7 +116,59 @@ class Interval(unittest.TestCase):
         for bad in (0, 1, 7, "15", 600):
             with self.assertRaises(ValueError):
                 app.validate_settings_patch({"interval": bad})
-        self.assertEqual(app.DEFAULT_SETTINGS["interval"], 15)
+        self.assertEqual(app.DEFAULT_SETTINGS["interval"], 6)
+
+    def test_old_default_migrates_to_6s(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "settings.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"interval": 15, "unit": "C"}, f)  # file cài đặt của bản ≤ 1.4
+            self.assertEqual(app.SettingsStore(path).get()["interval"], 6)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"settings_version": 2, "interval": 15}, f)  # người dùng tự chọn 15 s
+            self.assertEqual(app.SettingsStore(path).get()["interval"], 15)
+
+    def test_overlay_more_transparent(self):
+        import tempfile
+        self.assertEqual(app.DEFAULT_SETTINGS["overlay"]["opacity"], 0.55)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "settings.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"settings_version": 2, "overlay": {"opacity": 0.85, "x": 5, "y": 6}}, f)
+            ov = app.SettingsStore(path).get()["overlay"]
+            self.assertEqual((ov["opacity"], ov["x"]), (0.55, 5))
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"settings_version": 2, "overlay": {"opacity": 0.4}}, f)
+            self.assertEqual(app.SettingsStore(path).get()["overlay"]["opacity"], 0.25)  # không xuống dưới 25%
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"settings_version": 3, "overlay": {"opacity": 0.9}}, f)  # đã chuyển rồi -> giữ nguyên
+            self.assertEqual(app.SettingsStore(path).get()["overlay"]["opacity"], 0.9)
+
+
+class JunkBoardSensors(unittest.TestCase):
+    def test_superio_zero_readings_fall_back_to_ssd(self):
+        tree = {"Text": "Sensor", "Children": [{"Text": "PC", "Children": [
+            {"Text": "LENOVO 310B", "HardwareId": "/motherboard", "ImageURL": "images_icon/mainboard.png", "Children": [
+                {"Text": "Nuvoton NCT6683D", "HardwareId": "/lpc/nct6683d/0", "ImageURL": "images_icon/chip.png", "Children": [
+                    {"Text": "Temperatures", "Children": [
+                        {"Text": "Temperature #1", "Type": "Temperature", "RawValue": 0.0, "Value": "0.0 °C",
+                         "SensorId": "/lpc/nct6683d/0/temperature/1", "Children": []},
+                        {"Text": "Temperature #2", "Type": "Temperature", "RawValue": 127.0, "Value": "127.0 °C",
+                         "SensorId": "/lpc/nct6683d/0/temperature/2", "Children": []}]}]}]},
+            {"Text": "SSD", "HardwareId": "/nvme/0", "ImageURL": "images_icon/hdd.png", "Children": [
+                {"Text": "Temperatures", "Children": [
+                    {"Text": "Temperature", "Type": "Temperature", "RawValue": 40.0, "Value": "40.0 °C",
+                     "SensorId": "/nvme/0/temperature/0", "Children": []}]}]}]}]}
+        lst, _ = sensors.parse_lhm(tree)
+        board = [s for s in lst if s.category == "board"]
+        self.assertEqual([s.value for s in board], [None, None])  # 0°C và 127°C là giá trị rác
+        self.assertEqual(sensors.pick_primary(lst)["board"], "/nvme/0/temperature/0")
+
+    def test_real_superio_reading_used(self):
+        s = [sensors.Sensor("/lpc/x/t1", "Temperature #1", "LENOVO / NCT6683D", "board", 46.0),
+             sensors.Sensor("/nvme/0/t", "Temperature", "SSD", "storage", 40.0)]
+        self.assertEqual(sensors.pick_primary(s)["board"], "/lpc/x/t1")
 
 
 if __name__ == "__main__":
