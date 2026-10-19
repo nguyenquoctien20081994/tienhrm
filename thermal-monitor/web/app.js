@@ -768,11 +768,20 @@
     critical: ["Quá nhiệt! Lưu công việc và đóng ứng dụng nặng ngay!", "Nếu bị lặp lại, báo IT/HCNS kiểm tra máy giúp mình nhé."],
     unknown: ["Đang đọc cảm biến…", "Chờ mình một chút nha!"],
   };
+  const CREW_LEVELS = Object.keys(CREW_LINES);
+  let brandHave = {};  // ảnh người dùng tự tải lên (thay cho ảnh có sẵn)
+  let crewPreloaded = false;
   function renderCrew(a) {
     const crew = $("#crew");
     if (crew.hidden) return;
     const level = a?.level || "unknown";
     crew.dataset.level = level;
+    for (const mate of crew.querySelectorAll(".mate")) {
+      const slot = mate.dataset.slot, img = $("img", mate);
+      const src = brandHave[slot] ? `api/brand/${slot}?v=${brandStamp}` : `img/vt/${slot}-${level}.webp`;
+      if (img.getAttribute("src") !== src) img.setAttribute("src", src);
+      $(".fig", mate).classList.toggle("has-img", !!brandHave[slot]);
+    }
     crew.style.setProperty("--lv", LEVEL_COLOR[level] || LEVEL_COLOR.unknown);
     const [nam, nu] = CREW_LINES[level] || CREW_LINES.unknown;
     $("#sayNam").textContent = nam;
@@ -786,8 +795,14 @@
     $("#btnBrand").textContent = vt ? "THERMAL" : "VIỆT TÂM";
     $("#btnBrand").title = vt ? "Về giao diện Thermal Core gốc" : "Đổi sang giao diện Việt Tâm (có nhân vật)";
     $("#crew").hidden = !vt;
+    $("#favicon").href = vt ? "img/vt/logo.png" : FAVICON_THERMAL;
+    if (vt && !crewPreloaded) {  // tải trước mọi tư thế để đổi hình không bị chớp
+      crewPreloaded = true;
+      for (const slot of ["nam", "nu"]) for (const lv of CREW_LEVELS) new Image().src = `img/vt/${slot}-${lv}.webp`;
+    }
     if (vt) { loadBrandImages(); renderCrew(state.snap?.assessment); }
   }
+  const FAVICON_THERMAL = $("#favicon").href;
   // Ảnh nhân vật / logo do người dùng tải lên (lưu trong thư mục dữ liệu của app)
   let brandStamp = Date.now();
   async function loadBrandImages() {
@@ -795,15 +810,9 @@
     if (hasBackend && !state.demo) {
       try { const r = await fetch("api/brand", { cache: "no-store" }); if (r.ok) have = await r.json(); } catch { /* app đã tắt */ }
     }
-    const setImg = (img, slot) => {
-      if (have[slot]) { img.src = `api/brand/${slot}?v=${brandStamp}`; img.hidden = false; } else { img.removeAttribute("src"); img.hidden = true; }
-    };
-    for (const mate of document.querySelectorAll("#crew .mate")) {
-      const img = $("img", mate);
-      setImg(img, mate.dataset.slot);
-      $(".fig", mate).classList.toggle("has-img", !img.hidden);
-    }
-    setImg($("#vtLogo"), "logo");
+    brandHave = have;
+    renderCrew(state.snap?.assessment);
+    $("#vtLogo").src = have.logo ? `api/brand/logo?v=${brandStamp}` : "img/vt/logo.png";
     for (const row of document.querySelectorAll(".brand-slot")) {
       const slot = row.dataset.slot;
       $(".thumb", row).style.backgroundImage = have[slot] ? `url("api/brand/${slot}?v=${brandStamp}")` : "";
@@ -826,7 +835,7 @@
       const r = await fetch(`api/brand/${slot}`, { method, headers: { "X-TCH": "1", "Content-Type": "image/png" }, body });
       const res = await r.json().catch(() => ({}));
       if (!r.ok) { note.textContent = `Không lưu được ảnh: ${res.error || r.status}`; return; }
-      note.textContent = method === "DELETE" ? "Đã xoá ảnh – dùng lại hình minh hoạ." : "Đã lưu ảnh.";
+      note.textContent = method === "DELETE" ? "Đã xoá ảnh – dùng lại nhân vật/logo có sẵn." : "Đã lưu ảnh.";
       brandStamp = Date.now();
       loadBrandImages();
     };

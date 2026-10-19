@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="author" content="nguyenquoctien – Nguyễn Quốc Tiến" />
   <title>Thermal Core HUD</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%2322e5ff' stroke-width='3'/%3E%3Cpath d='M16 16 L24 9' stroke='%23ff4d2e' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%2322e5ff' stroke-width='3'/%3E%3Cpath d='M16 16 L24 9' stroke='%23ff4d2e' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -27,7 +27,7 @@
       </div>
     </div>
     <div class="brand brand-vt">
-      <div class="vt-logo"><img id="vtLogo" alt="Logo Việt Tâm" hidden /><span>VT</span></div>
+      <div class="vt-logo"><img id="vtLogo" alt="Logo Việt Tâm" src="img/vt/logo.png" /></div>
       <div>
         <h1>VIỆT<span>TÂM</span></h1>
         <small>GIÁM SÁT NHIỆT ĐỘ MÁY TÍNH · THERMAL CORE</small>
@@ -69,57 +69,19 @@
     </div>
   </section>
 
-  <!-- Giao diện Việt Tâm: 2 nhân vật nói tình trạng máy; biểu cảm đổi theo mức nhiệt.
-       Hình mặc định là hình vẽ minh hoạ – thay bằng ảnh nhân vật thật trong CALIBRATE. -->
+  <!-- Giao diện Việt Tâm: 2 nhân vật nói tình trạng máy; tư thế đổi theo mức nhiệt (web/img/vt/<nam|nu>-<mức>.webp).
+       Có thể thay bằng ảnh khác trong CALIBRATE. -->
   <section id="crew" class="crew" data-level="unknown" hidden>
     <div class="mate" data-slot="nam">
       <figure class="fig">
-        <img alt="Nhân vật nam" hidden />
-        <svg viewBox="0 0 120 150" aria-hidden="true">
-            <path class="shirt-nam" d="M16 150 C16 118 34 104 60 104 C86 104 104 118 104 150 Z" />
-            <path d="M47 104 L60 119 L73 104" fill="none" stroke="#df6b33" stroke-width="5" stroke-linejoin="round" />
-            <rect x="74" y="124" width="17" height="10" rx="2" fill="#df6b33" />
-            <text x="82.5" y="132" font-size="7" font-weight="700" text-anchor="middle" fill="#fff">VT</text>
-            <rect class="skin" x="52" y="88" width="16" height="18" rx="5" />
-            <circle class="skin" cx="32" cy="68" r="5" /><circle class="skin" cx="88" cy="68" r="5" />
-            <circle class="skin" cx="60" cy="66" r="28" />
-            <path d="M33 62 C33 70 35 74 36 76 L38 62 Z M87 62 C87 70 85 74 84 76 L82 62 Z" fill="#2b2118" />
-            <path d="M30 58 C30 33 44 23 60 23 C76 23 90 33 90 58 Z" fill="#df6b33" />
-            <rect x="56" y="23" width="8" height="33" rx="3" fill="#f39a66" />
-            <rect x="23" y="54" width="74" height="8" rx="4" fill="#bf5420" />
-            <g class="brow"><path d="M44 63 L55 62" /><path d="M65 62 L76 63" /></g>
-            <circle class="eye" cx="50" cy="70" r="3.3" /><circle class="eye" cx="70" cy="70" r="3.3" />
-            <g class="blush"><ellipse cx="42" cy="80" rx="5" ry="3" /><ellipse cx="78" cy="80" rx="5" ry="3" /></g>
-            <path class="mouth m-smile" d="M50 82 Q60 92 70 82" /><path class="mouth m-flat" d="M52 85 L68 85" />
-            <path class="mouth m-worry" d="M51 88 Q60 80 69 88" /><ellipse class="mouth m-shock" cx="60" cy="86" rx="5" ry="6.5" />
-            <path class="sweat" d="M91 46 q5 8 0 12 q-5 -4 0 -12z" /><path class="sweat s2" d="M27 50 q4 6 0 9 q-4 -3 0 -9z" />
-          </svg>
+        <img alt="Nhân vật nam" src="img/vt/nam-unknown.webp" />
       </figure>
       <p class="bubble" id="sayNam">Đang đọc cảm biến…</p>
     </div>
     <div class="mate right" data-slot="nu">
       <p class="bubble" id="sayNu">Chờ mình một chút nha!</p>
       <figure class="fig">
-        <img alt="Nhân vật nữ" hidden />
-        <svg viewBox="0 0 120 150" aria-hidden="true">
-            <path class="hair" d="M30 68 C27 36 44 30 60 30 C76 30 93 36 90 68 L96 112 C82 118 38 118 24 112 Z" />
-            <path class="shirt-nu" d="M16 150 C16 118 34 105 60 105 C86 105 104 118 104 150 Z" />
-            <path d="M48 105 L60 117 L72 105" fill="#fff" />
-            <rect x="72" y="125" width="17" height="10" rx="2" fill="#1f2a4a" />
-            <text x="80.5" y="133" font-size="7" font-weight="700" text-anchor="middle" fill="#fff">VT</text>
-            <rect class="skin" x="52" y="88" width="16" height="18" rx="5" />
-            <circle class="skin" cx="60" cy="67" r="27" />
-            <path class="hair" d="M33 66 C33 42 47 35 62 36 C77 37 88 46 87 64 C79 52 68 47 57 49 C47 51 39 57 33 66 Z" />
-            <path d="M40 44 C50 36 70 35 82 45" fill="none" stroke="#f5c84c" stroke-width="3.5" stroke-linecap="round" />
-            <g class="brow"><path d="M45 63 L55 61.5" /><path d="M65 61.5 L75 63" /></g>
-            <circle class="eye" cx="50" cy="71" r="3.2" /><circle class="eye" cx="70" cy="71" r="3.2" />
-            <path d="M46 69 L44 67 M74 69 L76 67" stroke="#2b1d16" stroke-width="1.6" stroke-linecap="round" />
-            <circle cx="33" cy="80" r="2.4" fill="#f5c84c" /><circle cx="87" cy="80" r="2.4" fill="#f5c84c" />
-            <g class="blush"><ellipse cx="43" cy="81" rx="5" ry="3" /><ellipse cx="77" cy="81" rx="5" ry="3" /></g>
-            <path class="mouth m-smile" d="M51 83 Q60 92 69 83" /><path class="mouth m-flat" d="M53 86 L67 86" />
-            <path class="mouth m-worry" d="M52 89 Q60 81 68 89" /><ellipse class="mouth m-shock" cx="60" cy="87" rx="4.5" ry="6" />
-            <path class="sweat" d="M90 48 q5 8 0 12 q-5 -4 0 -12z" /><path class="sweat s2" d="M28 52 q4 6 0 9 q-4 -3 0 -9z" />
-          </svg>
+        <img alt="Nhân vật nữ" src="img/vt/nu-unknown.webp" />
       </figure>
     </div>
   </section>
@@ -219,8 +181,8 @@
         <div class="brand-slot" data-slot="logo"><i class="thumb"></i><span>Logo công ty</span>
           <label class="btn">CHỌN ẢNH<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden /></label>
           <button type="button" class="del">XOÁ</button></div>
-        <p class="brand-note" id="brandNote">Nên dùng ảnh PNG nền trong suốt, nhân vật đứng thẳng. Ảnh chỉ lưu trên máy này.
-          Chưa chọn ảnh thì app dùng hình vẽ minh hoạ.</p>
+        <p class="brand-note" id="brandNote">App đã có sẵn nhân vật và logo Việt Tâm (nhân vật đổi tư thế theo nhiệt độ).
+          Chỉ chọn ảnh khi muốn thay – nên dùng PNG nền trong suốt; ảnh thay thế dùng chung cho mọi mức nhiệt và chỉ lưu trên máy này.</p>
       </fieldset>
       <p class="diag-note">Thiếu cảm biến (vd. nhiệt độ mainboard)? Bấm <a id="lnkDiag" href="api/diagnostics" download>XUẤT FILE CHẨN ĐOÁN</a>
         rồi gửi file vừa tải về cho người hỗ trợ – file chỉ chứa thông tin phần cứng và số đo.</p>

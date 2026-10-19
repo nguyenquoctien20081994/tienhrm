@@ -35,6 +35,19 @@ class BrandSettings(unittest.TestCase):
         self.assertIsNone(app.image_type(b"<svg onload='alert(1)'>"))
 
 
+class BundledImages(unittest.TestCase):
+    def test_every_level_has_both_characters_and_logo(self):
+        """app.js dùng web/img/vt/<nam|nu>-<mức>.webp cho mọi mức nhiệt mà assess.py trả về (và 'unknown')."""
+        import assess
+        folder = os.path.join(os.path.dirname(__file__), "..", "web", "img", "vt")
+        for level in (*assess.LEVELS, "unknown"):
+            for slot in ("nam", "nu"):
+                with open(os.path.join(folder, f"{slot}-{level}.webp"), "rb") as f:
+                    self.assertEqual(app.image_type(f.read(16)), "image/webp", f"{slot}-{level}")
+        with open(os.path.join(folder, "logo.png"), "rb") as f:
+            self.assertEqual(app.image_type(f.read(16)), "image/png")
+
+
 class BrandEndpoints(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

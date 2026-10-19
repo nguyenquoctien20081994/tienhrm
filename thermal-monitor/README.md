@@ -63,14 +63,26 @@ Kết luận "tản nhiệt tốt/kém" chỉ đưa ra khi có số liệu tải
 
 ### Giao diện Việt Tâm (có nhân vật)
 - Nút **VIỆT TÂM** trên thanh điều khiển chuyển sang giao diện của Công ty TNHH Thiết Bị Việt Tâm (bấm **THERMAL** để về giao diện gốc):
-  tông cam – xanh đen, tiêu đề "VIỆT TÂM", và 2 nhân vật nam/nữ nói tình trạng máy bằng lời dễ hiểu.
-- Biểu cảm nhân vật đổi theo mức nhiệt: mát → cười, ấm → bình thường, nóng → lo lắng + đổ mồ hôi, quá nhiệt → hốt hoảng, rung.
+  logo Việt Tâm ở tiêu đề và trên tab trình duyệt, tông xanh dương theo logo, cùng 2 nhân vật nam/nữ mặc đồng phục công ty
+  nói tình trạng máy bằng lời dễ hiểu.
+- Nhân vật đổi tư thế theo mức nhiệt (ảnh trong `web/img/vt/<nam|nu>-<mức>.webp`):
+
+  | Mức nhiệt | Nam | Nữ |
+  |---|---|---|
+  | Đang chờ số liệu | Khoanh tay | Ôm sổ |
+  | Mát | Giơ ngón cái | Tạo dáng chữ V, nháy mắt |
+  | Bình thường | Vẫy tay | Vẫy tay |
+  | Hơi ấm | Cầm laptop | Cầm laptop |
+  | Nóng | Gọi điện | Chỉ tay, cầm sổ |
+  | Quá nhiệt | Chỉ tay khẩn cấp | Gọi điện báo IT/HCNS |
+
   Khi có lời khuyên cụ thể (vd. ổ cứng cần sao lưu), nhân vật nữ nói lời khuyên đó.
-- Màu riêng của 3 đồng hồ (CPU xanh, GPU hồng, MAINBOARD lục) giữ nguyên ở cả 2 giao diện.
-- **Dùng nhân vật / logo thật**: mở **CALIBRATE** → mục *Ảnh cho giao diện Việt Tâm* → **CHỌN ẢNH** cho *Nhân vật nam*, *Nhân vật nữ*, *Logo công ty*.
-  Nên dùng PNG nền trong suốt, nhân vật đứng thẳng. Ảnh được thu nhỏ còn tối đa 640 px và lưu trong thư mục dữ liệu của app
-  (`%LOCALAPPDATA%\ThermalCoreHUD\brand\`), không gửi ra ngoài. Chỉ nhận PNG/JPG/GIF/WebP (không nhận SVG vì lý do bảo mật).
-  Bấm **XOÁ** để quay về hình vẽ minh hoạ có sẵn.
+- Màu riêng của 3 đồng hồ (CPU xanh ngọc, GPU hồng, MAINBOARD lục) giữ nguyên ở cả 2 giao diện.
+- **Thay ảnh khác** (không bắt buộc): **CALIBRATE** → *Ảnh cho giao diện Việt Tâm* → **CHỌN ẢNH** cho *Nhân vật nam*, *Nhân vật nữ*,
+  *Logo công ty*. Ảnh thay thế dùng chung cho mọi mức nhiệt, được thu nhỏ còn tối đa 640 px và lưu trong
+  `%LOCALAPPDATA%\ThermalCoreHUD\brand\` (không gửi ra ngoài). Chỉ nhận PNG/JPG/GIF/WebP (không nhận SVG vì lý do bảo mật).
+  Bấm **XOÁ** để quay về ảnh có sẵn.
+- Ảnh nhân vật và logo là tài sản của Công ty TNHH Thiết Bị Việt Tâm, chỉ dùng cho app nội bộ này.
 
 ### CORE MAP – bản đồ nhiệt từng nhân CPU
 Mỗi hàng là một nhân, mỗi cột là một lần đo trong 60 phút gần nhất; màu càng đậm/càng cam là càng nóng (thang cố định 30–100°C). Cột bên phải ghi nhiệt độ và tải hiện tại của từng nhân. Rê chuột để xem chi tiết. Nhân nào nóng hơn hẳn các nhân khác có thể do lỗi keo tản nhiệt.

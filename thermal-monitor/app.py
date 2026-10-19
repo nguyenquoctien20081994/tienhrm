@@ -29,7 +29,7 @@ import history
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.7.0"
 APP_AUTHOR = "Nguyễn Quốc Tiến"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
