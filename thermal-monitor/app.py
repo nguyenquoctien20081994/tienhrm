@@ -9,10 +9,12 @@ Bản đóng gói: ThermalCoreHUD.exe (cùng tham số).
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import mimetypes
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -25,7 +27,7 @@ from urllib.parse import urlparse
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
 FROZEN = getattr(sys, "frozen", False)
@@ -34,6 +36,115 @@ if IS_WINDOWS:
     import winsupport
 else:
     winsupport = None
+
+
+DEFAULT_SETTINGS = {
+    "unit": "C",
+    # Ngưỡng cho ThinkPad X1 Yoga Gen 5 (i7-10610U, TjMax 100 °C; iGPU chung đế với CPU)
+    "thresholds": {"cpu": {"warn": 85, "crit": 95}, "gpu": {"warn": 85, "crit": 95},
+                   "board": {"warn": 65, "crit": 80}},
+    "picks": {},
+    "overlay": {"enabled": False, "opacity": 0.85, "x": None, "y": None},
+}
+GAUGE_KEYS = ("cpu", "gpu", "board")
+
+
+def settings_path() -> str:
+    if IS_WINDOWS:
+        base = winsupport.data_dir()
+    else:
+        base = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "thermalcorehud")
+        os.makedirs(base, exist_ok=True)
+    return os.path.join(base, "settings.json")
+
+
+def _deep_merge(dst: dict, src: dict) -> dict:
+    for k, v in src.items():
+        if isinstance(v, dict) and isinstance(dst.get(k), dict):
+            _deep_merge(dst[k], v)
+        else:
+            dst[k] = v
+    return dst
+
+
+def validate_settings_patch(patch) -> dict:
+    """Chỉ nhận các khoá đã biết, kiểu và khoảng giá trị hợp lệ (dữ liệu đến từ trình duyệt)."""
+    if not isinstance(patch, dict):
+        raise ValueError("settings phải là object")
+    out: dict = {}
+    if "unit" in patch:
+        if patch["unit"] not in ("C", "F"):
+            raise ValueError("unit phải là C hoặc F")
+        out["unit"] = patch["unit"]
+    if "thresholds" in patch:
+        th = patch["thresholds"]
+        if not isinstance(th, dict):
+            raise ValueError("thresholds không hợp lệ")
+        out["thresholds"] = {}
+        for k, v in th.items():
+            if k not in GAUGE_KEYS or not isinstance(v, dict):
+                raise ValueError(f"thresholds.{k} không hợp lệ")
+            warn, crit = v.get("warn"), v.get("crit")
+            if not all(isinstance(x, (int, float)) and not isinstance(x, bool) and 30 <= x <= 125 for x in (warn, crit)) \
+                    or warn >= crit:
+                raise ValueError(f"thresholds.{k}: cần 30 ≤ warn < crit ≤ 125")
+            out["thresholds"][k] = {"warn": warn, "crit": crit}
+    if "picks" in patch:
+        pk = patch["picks"]
+        if not isinstance(pk, dict) or any(k not in GAUGE_KEYS or not isinstance(v, str) or len(v) > 300
+                                           for k, v in pk.items()):
+            raise ValueError("picks không hợp lệ")
+        out["picks"] = dict(pk)
+    if "overlay" in patch:
+        ov = patch["overlay"]
+        if not isinstance(ov, dict):
+            raise ValueError("overlay không hợp lệ")
+        out["overlay"] = {}
+        if "opacity" in ov:
+            if not isinstance(ov["opacity"], (int, float)) or not 0.25 <= ov["opacity"] <= 1:
+                raise ValueError("overlay.opacity phải trong 0.25–1")
+            out["overlay"]["opacity"] = float(ov["opacity"])
+    return out
+
+
+class SettingsStore:
+    """Cài đặt dùng chung cho giao diện web và overlay, lưu ra file JSON."""
+
+    def __init__(self, path: str | None):
+        self.path = path
+        self.lock = threading.Lock()
+        self.data = copy.deepcopy(DEFAULT_SETTINGS)
+        if path and os.path.isfile(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    _deep_merge(self.data, {k: v for k, v in loaded.items() if k in DEFAULT_SETTINGS})
+            except (OSError, ValueError) as exc:
+                print("Không đọc được settings.json, dùng mặc định:", exc)
+        self.listeners: list = []
+
+    def get(self) -> dict:
+        with self.lock:
+            return copy.deepcopy(self.data)
+
+    def update(self, patch: dict) -> dict:
+        with self.lock:
+            if "picks" in patch:  # picks thay thế toàn bộ (cho phép quay về AUTO)
+                self.data["picks"] = {}
+            _deep_merge(self.data, copy.deepcopy(patch))
+            snapshot = copy.deepcopy(self.data)
+            if self.path:
+                try:
+                    tmp = self.path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                    os.replace(tmp, self.path)
+                except OSError as exc:
+                    print("Không lưu được settings.json:", exc)
+        for fn in self.listeners:
+            fn(patch)
+        return snapshot
 
 
 def resource_dir() -> str:
@@ -45,8 +156,9 @@ def resource_dir() -> str:
 class Sampler:
     """Đọc cảm biến theo chu kỳ trong một luồng riêng, phát snapshot mới cho các client SSE."""
 
-    def __init__(self, provider, interval: float, status_fn=None):
+    def __init__(self, provider, interval: float, status_fn=None, extra_fn=None):
         self.provider = provider
+        self.extra_fn = extra_fn  # trường bổ sung cho snapshot (vd. trạng thái overlay)
         self.interval = interval
         self.status_fn = status_fn  # trả về thông báo trạng thái (vd. đang tải LHM) hoặc None
         self.cond = threading.Condition()
@@ -74,6 +186,8 @@ class Sampler:
             snap["interval"] = self.interval
             snap["readMs"] = round((time.monotonic() - started) * 1000)
             snap["version"] = APP_VERSION
+            if self.extra_fn:
+                snap.update(self.extra_fn())
             with self.cond:
                 self.seq += 1
                 self.latest = snap
@@ -93,7 +207,7 @@ class Sampler:
                 self.idle_since = time.monotonic()
 
 
-def make_handler(sampler: Sampler, web_dir: str):
+def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_ctl=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = f"{APP_NAME}/{APP_VERSION}"
 
@@ -118,7 +232,40 @@ def make_handler(sampler: Sampler, web_dir: str):
                 return self._send(200, json.dumps(snap or {}).encode(), "application/json")
             if path == "/api/stream":
                 return self._stream()
+            if path == "/api/settings":
+                return self._json(200, store.get())
             return self._static(path)
+
+        def _json(self, code: int, obj) -> None:
+            self._send(code, json.dumps(obj, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+
+        def do_POST(self):  # noqa: N802
+            # Header tuỳ biến buộc trình duyệt kiểm tra CORS -> trang web lạ không gọi được API này
+            if self.headers.get("X-TCH") != "1":
+                return self._json(403, {"error": "forbidden"})
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > 65536:
+                    raise ValueError("body quá lớn")
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except ValueError as exc:
+                return self._json(400, {"error": str(exc)})
+            path = urlparse(self.path).path
+            if path == "/api/settings":
+                try:
+                    patch = validate_settings_patch(body)
+                except ValueError as exc:
+                    return self._json(400, {"error": str(exc)})
+                return self._json(200, store.update(patch))
+            if path == "/api/overlay":
+                action = body.get("action") if isinstance(body, dict) else None
+                if action not in ("show", "hide", "toggle"):
+                    return self._json(400, {"error": "action phải là show/hide/toggle"})
+                if overlay_ctl is None:
+                    return self._json(409, {"error": "overlay không khả dụng trên máy này"})
+                overlay_ctl.request(action)
+                return self._json(200, {"ok": True})
+            return self._json(404, {"error": "not found"})
 
         def _stream(self) -> None:
             self.send_response(200)
@@ -193,6 +340,16 @@ def open_ui(url: str, mode: str) -> None:
     webbrowser.open(url)
 
 
+def post_local(port: int, path: str, body: dict) -> bool:
+    req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json", "X-TCH": "1"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=2):
+            return True
+    except OSError:
+        return False
+
+
 def existing_instance(port: int) -> bool:
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/info", timeout=1) as r:
@@ -230,6 +387,8 @@ def main() -> None:
                     help="không tự tải/khởi động LibreHardwareMonitor (tự quản lý LHM)")
     ap.add_argument("--ui", choices=["auto", "window", "browser", "none"], default="auto",
                     help="cách mở giao diện: cửa sổ app (auto/window), tab trình duyệt, hoặc không mở")
+    ap.add_argument("--overlay", action="store_true",
+                    help="chỉ hiện overlay 3 đồng hồ ở góc trên bên phải (không mở cửa sổ chính)")
     ap.add_argument("--keep-running", action="store_true",
                     help="không tự thoát khi đóng cửa sổ giao diện (mặc định bản .exe tự thoát)")
     ap.add_argument("--version", action="version", version=f"{APP_NAME} {APP_VERSION}")
@@ -238,8 +397,11 @@ def main() -> None:
     setup_logging()
     url = f"http://127.0.0.1:{args.port}/"
     if existing_instance(args.port):
-        print("App đã chạy sẵn -> chỉ mở lại giao diện.")
-        open_ui(url, args.ui)
+        print("App đã chạy sẵn -> chuyển yêu cầu cho bản đang chạy.")
+        if args.overlay:
+            post_local(args.port, "/api/overlay", {"action": "show"})
+        else:
+            open_ui(url, args.ui)
         return
 
     interval = min(10.0, max(0.25, args.interval))
@@ -255,41 +417,80 @@ def main() -> None:
             if not winsupport.is_admin():
                 print("Cảnh báo: app không chạy quyền Administrator – có thể thiếu nhiệt độ CPU/mainboard.")
 
-    sampler = Sampler(provider, interval, status_fn=(lambda: manager.status) if manager else None)
+    store = SettingsStore(settings_path())
+    stop = threading.Event()
+
+    # Overlay cần cửa sổ đồ hoạ (Tk) chạy trên luồng chính; máy không có màn hình thì bỏ qua.
+    root = ctl = None
+    try:
+        import overlay
+        root = overlay.create_root()
+    except ImportError as exc:
+        print("Overlay không khả dụng (thiếu Pillow?):", exc)
+
+    def request_quit() -> None:
+        stop.set()
+        if ctl is not None:
+            ctl.request("quit")
+
+    if root is not None:
+        def open_main() -> None:
+            threading.Thread(target=open_ui, args=(url, "window"), daemon=True).start()
+
+        ctl = overlay.OverlayController(root, lambda: sampler.latest, store, open_main, request_quit)
+        store.listeners.append(lambda patch: ctl.request("reload"))
+    else:
+        print("Overlay tắt: không có màn hình đồ hoạ hoặc thiếu tkinter/Pillow.")
+
+    sampler = Sampler(provider, interval, status_fn=(lambda: manager.status) if manager else None,
+                      extra_fn=lambda: {"overlay": None if ctl is None else ctl.visible})
     sampler.start()
 
     # Chỉ lắng nghe 127.0.0.1: máy khác trong mạng không truy cập được.
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(sampler, resource_dir()))
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(sampler, resource_dir(), store, ctl))
     except OSError as exc:
         fatal(f"Không mở được cổng {args.port} ({exc}). Hãy đóng ứng dụng đang dùng cổng này "
               f"hoặc chạy với tham số --port khác.")
     server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
     print(f"{APP_NAME} {APP_VERSION} đang chạy tại {url}  (Ctrl+C để thoát)")
     first = sampler.wait_next(0, timeout=10)[1] or {}
     print(f"Nguồn dữ liệu: {first.get('source', '—')} | {len(first.get('sensors', []))} cảm biến nhiệt độ")
     for msg in first.get("messages", []):
         print("  !", msg)
-    open_ui(url, args.ui)
 
-    # Bản .exe: đóng cửa sổ giao diện -> app tự thoát (không để tiến trình chạy ngầm)
-    if FROZEN and not args.keep_running and args.ui != "none":
+    overlay_on = ctl is not None and (args.overlay or store.get()["overlay"]["enabled"])
+    if overlay_on:
+        ctl.request("show")
+    if not args.overlay:
+        open_ui(url, args.ui)
+
+    # Bản .exe: khi cửa sổ chính đã đóng VÀ overlay đang ẩn quá 10 giây -> tự thoát (không chạy ngầm)
+    if FROZEN and not args.keep_running and (args.ui != "none" or overlay_on):
         def watchdog() -> None:
-            while True:
-                time.sleep(2)
+            idle_from = None
+            while not stop.is_set():
+                time.sleep(1)
                 with sampler.cond:
-                    idle = sampler.had_client and sampler.clients == 0 and time.monotonic() - sampler.idle_since > 10
-                if idle:
-                    print("Cửa sổ giao diện đã đóng -> thoát.")
-                    server.shutdown()
-                    return
+                    used = sampler.had_client or (ctl is not None and ctl.ever_shown)
+                    idle = sampler.clients == 0 and not (ctl is not None and ctl.visible)
+                idle_from = (idle_from or time.monotonic()) if (used and idle) else None
+                if idle_from and time.monotonic() - idle_from > 10:
+                    print("Đã đóng cửa sổ chính và overlay -> thoát.")
+                    request_quit()
         threading.Thread(target=watchdog, daemon=True).start()
 
+    signal.signal(signal.SIGINT, lambda *_: request_quit())
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nĐã dừng.")
+        if root is not None:
+            root.mainloop()  # thoát khi OverlayController nhận lệnh "quit"
+        else:
+            while not stop.wait(0.5):
+                pass
     finally:
+        print("Đã dừng.")
+        server.shutdown()
         server.server_close()
         if manager:
             manager.shutdown()

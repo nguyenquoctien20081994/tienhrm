@@ -24,6 +24,9 @@ if not defined PY (
     pause & exit /b 1
 )
 
+:: Pillow can cho overlay 3 dong ho noi (chi cai lan dau)
+%PY% -c "import PIL" >nul 2>&1 || %PY% -m pip install --user -r requirements.txt
+
 :: app.py tu tai, cau hinh va khoi dong LibreHardwareMonitor
 %PY% app.py %*
 if errorlevel 1 pause

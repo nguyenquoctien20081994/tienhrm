@@ -45,6 +45,24 @@ Muốn xem thử giao diện mà không cần cảm biến: `ThermalCoreHUD.exe 
 - Biểu đồ 180 giây, các ô MIN/AVG/MAX.
 - **Cảnh báo**: vượt WARN thì thẻ chuyển màu cam; vượt CRIT thì báo động đỏ nhấp nháy, có băng cảnh báo và còi (nút `ALARM`, mặc định tắt).
 - Nút `°C/°F`, `CALIBRATE` (chỉnh ngưỡng), `⛶` (toàn màn hình).
+- **Co giãn theo cửa sổ**: 3 đồng hồ luôn nằm trên một hàng ngang. Khi thu hẹp cửa sổ, bên trong mỗi thẻ tự gọn lại theo bề rộng của thẻ: menu chọn cảm biến xuống dòng, ô số liệu chuyển thành 2 cột, rồi ẩn bớt biểu đồ.
+
+### Overlay – 3 đồng hồ nổi ở góc trên bên phải màn hình
+
+Bấm nút **OVERLAY** trên thanh công cụ (hoặc chạy `ThermalCoreHUD.exe --overlay` để chỉ mở overlay). Overlay là cửa sổ không viền, trong suốt mờ và **luôn nằm trên mọi app khác**:
+
+| Thao tác | Kết quả |
+|---|---|
+| Kéo chuột trái | Di chuyển overlay (vị trí được nhớ cho lần sau) |
+| Cuộn chuột | Tăng/giảm độ trong suốt (25–100 %) |
+| Nhấp đúp | Mở cửa sổ chính |
+| Chuột phải | Menu: mở cửa sổ chính, chọn độ trong suốt, về góc trên bên phải, ẩn overlay, thoát app |
+| Nút × | Ẩn overlay |
+
+- Overlay dùng chung ngưỡng cảnh báo, đơn vị °C/°F và lựa chọn cảm biến với cửa sổ chính. Nhãn có dấu `*` (ví dụ `BOARD*`) nghĩa là đang dùng cảm biến thay thế.
+- Có thể đóng cửa sổ chính mà vẫn giữ overlay. App chỉ tự thoát khi **cả** cửa sổ chính và overlay đều đã đóng; lần mở sau, overlay tự bật lại nếu lần trước đang bật.
+- Kim chỉ chuyển động mượt (30 khung hình/giây) khi nhiệt độ thay đổi; khi nhiệt độ ổn định, overlay chỉ vẽ lại 2 lần/giây nên gần như không tốn CPU.
+- Giới hạn: overlay không đè lên được game chạy chế độ *exclusive fullscreen*. Hãy chọn *borderless/windowed fullscreen* trong game.
 
 Ngưỡng mặc định:
 
@@ -60,8 +78,10 @@ Ngưỡng mặc định:
 ThermalCoreHUD.exe (hoặc python app.py)
     [--port 8787] [--interval 1.0] [--demo]
     [--lhm-url http://127.0.0.1:8085/data.json] [--lhm-auth user:pass] [--no-manage-lhm]
-    [--ui auto|window|browser|none] [--keep-running] [--version]
+    [--ui auto|window|browser|none] [--overlay] [--keep-running] [--version]
 ```
+
+- `--overlay`: chỉ hiện overlay 3 đồng hồ, không mở cửa sổ chính. Có thể tạo shortcut với tham số này và đặt vào thư mục Startup (`Win + R` → `shell:startup`) để overlay tự bật khi khởi động máy.
 
 - `--no-manage-lhm`: không tự tải/bật LibreHardwareMonitor (khi anh tự quản lý LHM).
 - `--keep-running`: không tự thoát khi đóng cửa sổ.
@@ -81,7 +101,8 @@ LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
  web/  (HTML + Canvas, không dùng thư viện ngoài, chạy được khi không có mạng)
 ```
 
-- Backend chỉ dùng thư viện chuẩn của Python, không cần `pip install`.
+- Backend chỉ dùng thư viện chuẩn của Python; overlay cần thêm Pillow (`requirements.txt`).
+- Ngưỡng cảnh báo, đơn vị, lựa chọn cảm biến và vị trí/độ trong suốt của overlay được lưu ở `%LOCALAPPDATA%\ThermalCoreHUD\settings.json`.
 - Cả app lẫn web server của LibreHardwareMonitor chỉ nghe trên `127.0.0.1`, máy khác trong mạng LAN không truy cập được.
 - Trên Linux, app đọc `/sys/class/hwmon` và dùng thêm `nvidia-smi` nếu có.
 - App **không bao giờ** tự chuyển sang số liệu giả khi mất cảm biến. Chế độ DEMO chỉ chạy khi gọi `--demo`, hoặc khi mở trực tiếp file HTML mà không có backend, và luôn có nhãn DEMO rõ ràng.
@@ -96,6 +117,7 @@ LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
 | Windows Defender báo `ThermalCoreHUD.exe` là virus | Báo nhầm, thường gặp với exe đóng gói bằng PyInstaller | Đối chiếu mã SHA256 ở trang Release (`Get-FileHash ThermalCoreHUD.exe`); nếu khớp thì Allow trong Protection history. Hoặc dùng Cách 2 (chạy từ mã nguồn) |
 | Windows chặn exe hoặc LHM | Smart App Control / SmartScreen | Bấm More info → Run anyway; hoặc chuột phải → Properties → Unblock |
 | Mainboard luôn hiện **THAY THẾ** (SSD) | Firmware không cho đọc ACPI thermal zone qua WMI | Bình thường với nhiều laptop; có thể chọn cảm biến khác ở menu |
+| Nút OVERLAY bị mờ | Bản chạy từ mã nguồn thiếu Pillow | `py -3 -m pip install -r requirements.txt` (bản .exe đã có sẵn) |
 | Cổng 8787 bị chiếm | Có ứng dụng khác dùng cổng này | `start-windows.bat --port 8899` |
 
 ## 7. Build file .exe

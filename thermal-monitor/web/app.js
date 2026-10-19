@@ -34,6 +34,33 @@
     if (t) { g.warn = t.warn; g.crit = t.crit; }
   }
 
+  // Cài đặt lưu ở app (settings.json) để overlay dùng chung; localStorage chỉ là dự phòng khi chạy DEMO trong trình duyệt
+  const hasBackend = location.protocol !== "file:";
+  function saveServer(patch) {
+    if (!hasBackend || state.demo) return;
+    fetch("api/settings", { method: "POST", headers: { "Content-Type": "application/json", "X-TCH": "1" }, body: JSON.stringify(patch) })
+      .catch(() => { /* app đã tắt: giữ bản localStorage */ });
+  }
+  async function loadServerSettings() {
+    if (!hasBackend) return;
+    try {
+      const r = await fetch("api/settings", { cache: "no-store" });
+      if (!r.ok) return;
+      const s = await r.json();
+      settings.unit = s.unit === "F" ? "F" : "C";
+      settings.picks = s.picks || {};
+      settings.thresholds = s.thresholds || {};
+      for (const g of GAUGES) {
+        const t = settings.thresholds[g.key];
+        if (t) { g.warn = t.warn; g.crit = t.crit; }
+      }
+      store.set("unit", settings.unit); store.set("picks", settings.picks); store.set("thresholds", settings.thresholds);
+      $("#btnUnit").textContent = "°" + settings.unit;
+      state.sensorKey = "";
+      rebuildAll();
+    } catch { /* backend cũ hoặc chưa sẵn sàng */ }
+  }
+
   // ------------------------------------------------------------------ tiện ích
   const $ = (s, el = document) => el.querySelector(s);
   const c2f = (c) => c * 9 / 5 + 32;
@@ -74,6 +101,7 @@
     g.pick.addEventListener("change", () => {
       settings.picks[cfg.key] = g.pick.value;
       store.set("picks", settings.picks);
+      saveServer({ picks: settings.picks });
       resetStats(g);
       if (state.snap) applySnapshot(state.snap, true);
     });
@@ -172,8 +200,10 @@
       f.strokeStyle = major ? (vc >= g.cfg.crit ? COLORS.red : vc >= g.cfg.warn ? COLORS.amber : "#e3eefa") : "#5f7590";
       f.lineWidth = major ? R * 0.013 : Math.max(1, R * 0.0055);
       f.stroke();
-      if (major) {
-        f.font = `600 ${R * 0.072}px ${FONT_UI}`;
+      // Đồng hồ nhỏ (cửa sổ hẹp): chữ to hơn tương đối và chỉ ghi số cách 20 độ để khỏi chồng chéo
+      const compact = R < 95 * g.dpr;
+      if (major && (!compact || Math.abs((v - sc.min) % (sc.major * 2)) < 1e-6)) {
+        f.font = `600 ${Math.max(R * 0.072, 9 * g.dpr)}px ${FONT_UI}`;
         f.fillStyle = "#c9d9ea"; f.textAlign = "center"; f.textBaseline = "middle";
         f.fillText(String(v), Math.cos(a) * R * 0.595, Math.sin(a) * R * 0.595);
       }
@@ -193,14 +223,14 @@
       f.strokeStyle = i < 5 ? "#5ad1ff" : i > 5 ? "#ff8a5a" : "#e3eefa"; f.lineWidth = Math.max(1, R * 0.006); f.stroke();
     }
     f.font = `${R * 0.04}px ${FONT_MONO}`; f.fillStyle = COLORS.muted; f.textAlign = "center";
-    f.fillText("Δ/10s", sx, sy + sr * 0.55);
+    if (R >= 95 * g.dpr) f.fillText("Δ/10s", sx, sy + sr * 0.55);
 
     // Cửa sổ hiển thị số
     const wx = -R * 0.29, wy = R * 0.3, ww = R * 0.58, wh = R * 0.2;
     f.fillStyle = "rgba(0,0,0,0.65)"; f.strokeStyle = "rgba(201,168,106,0.75)"; f.lineWidth = Math.max(1, R * 0.007);
     roundRect(f, wx, wy, ww, wh, R * 0.025); f.fill(); f.stroke();
     f.font = `${R * 0.04}px ${FONT_MONO}`; f.fillStyle = COLORS.muted; f.textAlign = "center";
-    f.fillText(`${g.cfg.key.toUpperCase()} · TEMP °${settings.unit}`, 0, wy + wh + R * 0.055);
+    if (R >= 95 * g.dpr) f.fillText(`${g.cfg.key.toUpperCase()} · TEMP °${settings.unit}`, 0, wy + wh + R * 0.055);
 
     g.layers = { bg, fg, sc };
   }
@@ -291,7 +321,7 @@
     x.textAlign = "center"; x.textBaseline = "middle";
     const wy = R * 0.4;
     if (live) {
-      x.font = `700 ${R * 0.135}px ${FONT_MONO}`;
+      x.font = `700 ${Math.max(R * 0.135, 10 * g.dpr)}px ${FONT_MONO}`;
       x.fillStyle = "rgba(255,255,255,0.06)"; x.fillText("888.8", 0, wy + R * 0.005);
       x.fillStyle = col; x.shadowColor = col; x.shadowBlur = R * 0.05;
       x.fillText(dv.toFixed(1), 0, wy + R * 0.005);
@@ -488,6 +518,13 @@
   }
 
   function updateHeader(snap) {
+    const ov = $("#btnOverlay");
+    const ovState = state.demo ? null : snap.overlay;  // null/undefined = máy không hỗ trợ overlay
+    ov.disabled = ovState == null;
+    ov.classList.toggle("on", ovState === true);
+    ov.textContent = ovState ? "OVERLAY ON" : "OVERLAY";
+    ov.title = ovState == null ? "Overlay cần chạy app trên máy có màn hình (Windows)"
+      : "Hiện/ẩn 3 đồng hồ nổi ở góc trên bên phải màn hình, nằm trên mọi cửa sổ";
     const live = snap.mode === "live";
     const pill = $("#linkPill");
     pill.dataset.state = state.demo || snap.mode === "demo" ? "demo" : live ? "live" : "off";
@@ -593,6 +630,7 @@
   // ------------------------------------------------------------------ kết nối
   function connect() {
     if (location.protocol === "file:") return startBrowserDemo("Đang mở file HTML trực tiếp nên không có backend đọc cảm biến – hiển thị DEMO. Hãy chạy app bằng start-windows.bat hoặc python app.py.");
+    loadServerSettings();
     const es = new EventSource("api/stream");
     es.onmessage = (ev) => {
       try { state.everLive = true; applySnapshot(JSON.parse(ev.data)); } catch (e) { console.error(e); }
@@ -634,6 +672,7 @@
   btnUnit.onclick = () => {
     settings.unit = settings.unit === "C" ? "F" : "C";
     store.set("unit", settings.unit);
+    saveServer({ unit: settings.unit });
     btnUnit.textContent = "°" + settings.unit;
     rebuildAll();
   };
@@ -644,6 +683,10 @@
     btnSound.classList.toggle("on", settings.sound);
     lastBeep = 0;
     if (settings.sound) { audio ||= new (window.AudioContext || window.webkitAudioContext)(); audio.resume?.(); }
+  };
+  $("#btnOverlay").onclick = () => {
+    fetch("api/overlay", { method: "POST", headers: { "Content-Type": "application/json", "X-TCH": "1" }, body: JSON.stringify({ action: "toggle" }) })
+      .catch(() => { /* bỏ qua */ });
   };
   $("#btnFull").onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.());
 
@@ -667,6 +710,7 @@
       settings.thresholds[g.key] = { warn: g.warn, crit: g.crit };
     }
     store.set("thresholds", settings.thresholds);
+    saveServer({ thresholds: settings.thresholds });
     rebuildAll();
   });
 

@@ -1,0 +1,2 @@
+# Chỉ cần cho overlay (3 đồng hồ nổi). Phần còn lại chỉ dùng thư viện chuẩn của Python.
+pillow>=10.1
