@@ -162,9 +162,10 @@ def seed_demo(db: HistoryDB, days: int = 7, step: int = 60, now: float | None = 
         work = max(0.0, math.sin((hour - 7) / 12 * math.pi)) if 7 <= hour <= 19 else 0.0
         load = min(100.0, 5 + 70 * work * (0.6 + 0.4 * rng.random()) + (25 if rng.random() < 0.03 else 0))
         cpu = 40 + 0.5 * load + rng.uniform(-2, 2)
-        clock = 2700 if (load > 70 and cpu > 85) else 4400  # xung nhân nhanh nhất, khớp DemoProvider
+        throttled = load > 70 and cpu > 85
+        clock = 2700 if throttled else 4400  # xung nhân nhanh nhất, khớp DemoProvider
         rows.append((ts, round(cpu, 1), round(cpu - 3, 1), round(36 + 0.12 * load, 1), round(load, 1), clock,
-                     "thermal" if clock == 2600 else "none", None))
+                     "thermal" if throttled else "none", None))
     with db.lock:
         db.conn.executemany(f"INSERT INTO samples (ts, {', '.join(COLUMNS)}) VALUES (?{', ?' * len(COLUMNS)})", rows)
         db.conn.commit()

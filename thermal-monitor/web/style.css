@@ -355,7 +355,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
 .life-bar { flex: 1; height: 8px; background: var(--inset); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .life-bar i { display: block; height: 100%; border-radius: 4px; background: var(--green); }
 .life strong { font-family: var(--font-mono); font-size: 20px; min-width: 64px; text-align: right; }
-.drive dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; margin: 0; }
+.drive dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 6px 12px; margin: 0; }
 .drive dt { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); }
 .drive dd { margin: 0; font-family: var(--font-mono); font-size: 13px; }
 
