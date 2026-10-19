@@ -125,6 +125,7 @@ def is_stale(data: dict, max_age: float = 60) -> bool:
 
 
 if __name__ == "__main__":  # kiểm tra nhanh: python hwinfo.py
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # console Windows mặc định cp1252
     try:
         d = parse(read_shared_memory())
         for t in temperatures(d):
