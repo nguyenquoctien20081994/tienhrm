@@ -131,7 +131,11 @@ Trên thẻ **MAINBOARD** có nút **NGUỒN A · LHM/SSD / B · HWiNFO** (cũng
 
 Cài đặt cho nguồn B:
 1. Tải HWiNFO từ trang chính thức `hwinfo.com`, cài và mở bằng chế độ **Sensors-only**.
-2. Vào **Settings** (biểu tượng bánh răng) → đánh dấu **Shared Memory Support** → OK. Có thể bật thêm *Auto Start* để HWiNFO chạy cùng Windows.
+2. Mở **Settings chính** của HWiNFO (không phải nút bánh răng trong cửa sổ cảm biến – nút đó là *Sensor Settings*):
+   - lúc khởi động: bấm nút **Settings** trên hộp thoại đầu tiên; hoặc
+   - khi HWiNFO đang chạy: **chuột phải biểu tượng HWiNFO ở khay hệ thống** (góc dưới phải, có thể nằm trong mũi tên ^) → **Settings**.
+
+   Ở tab đầu tiên (**General / User Interface**) đánh dấu **Shared Memory Support** → OK. Có thể bật thêm *Auto Start* để HWiNFO chạy cùng Windows.
 3. Trong Thermal Core, bấm **B · HWiNFO**. Bên cạnh nút hiện **✓ đang dùng** nếu đọc được.
 4. Nếu hiện **⚠ lỗi → tạm dùng A** (rê chuột để xem lý do): HWiNFO chưa chạy, chưa bật chia sẻ, hoặc đã hết 12 giờ – bật lại Shared Memory Support trong HWiNFO. Trong lúc đó đồng hồ MAINBOARD tự dùng nguồn A, không bị trống.
 
