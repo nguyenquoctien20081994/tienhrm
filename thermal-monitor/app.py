@@ -37,6 +37,14 @@ if IS_WINDOWS:
 else:
     winsupport = None
 
+# Windows: khi đầu ra bị chuyển hướng (pipe/file) Python dùng bảng mã ANSI (cp1252) và lỗi khi in tiếng Việt
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
+
 
 DEFAULT_SETTINGS = {
     "unit": "C",
