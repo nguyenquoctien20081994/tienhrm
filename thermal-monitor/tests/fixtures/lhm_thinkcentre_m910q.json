@@ -1,0 +1,357 @@
+{
+ "id": 0,
+ "Text": "Sensor",
+ "Min": "Min",
+ "Value": "Value",
+ "Max": "Max",
+ "ImageURL": "",
+ "Children": [
+  {
+   "id": 1,
+   "Text": "THINKCENTRE-M910Q",
+   "Min": "",
+   "Value": "",
+   "Max": "",
+   "ImageURL": "images_icon/computer.png",
+   "Children": [
+    {
+     "id": 2,
+     "Text": "LENOVO 310F",
+     "Min": "",
+     "Value": "",
+     "Max": "",
+     "HardwareId": "/motherboard",
+     "ImageURL": "images_icon/mainboard.png",
+     "Children": []
+    },
+    {
+     "id": 3,
+     "Text": "Intel Core i5-7500T",
+     "Min": "",
+     "Value": "",
+     "Max": "",
+     "HardwareId": "/intelcpu/0",
+     "ImageURL": "images_icon/cpu.png",
+     "Children": [
+      {
+       "id": 4,
+       "Text": "Clocks",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/clock.png",
+       "Children": [
+        {
+         "id": 5,
+         "Text": "Core #1",
+         "Min": "2710,0 MHz",
+         "Value": "2710,0 MHz",
+         "Max": "2710,0 MHz",
+         "SensorId": "/intelcpu/0/clock/1",
+         "Type": "Clock",
+         "RawMin": 2710.0,
+         "RawValue": 2710.0,
+         "RawMax": 2710.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 5,
+         "Text": "Core #2",
+         "Min": "2720,0 MHz",
+         "Value": "2720,0 MHz",
+         "Max": "2720,0 MHz",
+         "SensorId": "/intelcpu/0/clock/2",
+         "Type": "Clock",
+         "RawMin": 2720.0,
+         "RawValue": 2720.0,
+         "RawMax": 2720.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 5,
+         "Text": "Core #3",
+         "Min": "2730,0 MHz",
+         "Value": "2730,0 MHz",
+         "Max": "2730,0 MHz",
+         "SensorId": "/intelcpu/0/clock/3",
+         "Type": "Clock",
+         "RawMin": 2730.0,
+         "RawValue": 2730.0,
+         "RawMax": 2730.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 5,
+         "Text": "Core #4",
+         "Min": "2740,0 MHz",
+         "Value": "2740,0 MHz",
+         "Max": "2740,0 MHz",
+         "SensorId": "/intelcpu/0/clock/4",
+         "Type": "Clock",
+         "RawMin": 2740.0,
+         "RawValue": 2740.0,
+         "RawMax": 2740.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      },
+      {
+       "id": 10,
+       "Text": "Temperatures",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/temperature.png",
+       "Children": [
+        {
+         "id": 11,
+         "Text": "CPU Core #1",
+         "Min": "46,0 °C",
+         "Value": "46,0 °C",
+         "Max": "46,0 °C",
+         "SensorId": "/intelcpu/0/temperature/0",
+         "Type": "Temperature",
+         "RawMin": 46.0,
+         "RawValue": 46.0,
+         "RawMax": 46.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 12,
+         "Text": "CPU Core #1 Distance to TjMax",
+         "Min": "54,0 °C",
+         "Value": "54,0 °C",
+         "Max": "54,0 °C",
+         "SensorId": "/intelcpu/0/temperature/5",
+         "Type": "Temperature",
+         "RawMin": 54.0,
+         "RawValue": 54.0,
+         "RawMax": 54.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 13,
+         "Text": "CPU Package",
+         "Min": "48,0 °C",
+         "Value": "48,0 °C",
+         "Max": "48,0 °C",
+         "SensorId": "/intelcpu/0/temperature/4",
+         "Type": "Temperature",
+         "RawMin": 48.0,
+         "RawValue": 48.0,
+         "RawMax": 48.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      },
+      {
+       "id": 14,
+       "Text": "Load",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/load.png",
+       "Children": [
+        {
+         "id": 15,
+         "Text": "CPU Total",
+         "Min": "12,5 %",
+         "Value": "12,5 %",
+         "Max": "12,5 %",
+         "SensorId": "/intelcpu/0/load/0",
+         "Type": "Load",
+         "RawMin": 12.5,
+         "RawValue": 12.5,
+         "RawMax": 12.5,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      },
+      {
+       "id": 16,
+       "Text": "Powers",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/power.png",
+       "Children": [
+        {
+         "id": 17,
+         "Text": "CPU Package",
+         "Min": "9,3 W",
+         "Value": "9,3 W",
+         "Max": "9,3 W",
+         "SensorId": "/intelcpu/0/power/0",
+         "Type": "Power",
+         "RawMin": 9.3,
+         "RawValue": 9.3,
+         "RawMax": 9.3,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": 40,
+     "Text": "Intel(R) HD Graphics 630",
+     "Min": "",
+     "Value": "",
+     "Max": "",
+     "HardwareId": "/gpu-intel-integrated/0",
+     "ImageURL": "images_icon/intel.png",
+     "Children": []
+    },
+    {
+     "id": 20,
+     "Text": "SAMSUNG MZVLB256HAHQ-000L7",
+     "Min": "",
+     "Value": "",
+     "Max": "",
+     "HardwareId": "/nvme/0",
+     "ImageURL": "images_icon/hdd.png",
+     "Children": [
+      {
+       "id": 21,
+       "Text": "Temperatures",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/temperature.png",
+       "Children": [
+        {
+         "id": 22,
+         "Text": "Temperature",
+         "Min": "41,0 °C",
+         "Value": "41,0 °C",
+         "Max": "41,0 °C",
+         "SensorId": "/nvme/0/temperature/0",
+         "Type": "Temperature",
+         "RawMin": 41.0,
+         "RawValue": 41.0,
+         "RawMax": 41.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 23,
+         "Text": "Temperature #1",
+         "Min": "41,0 °C",
+         "Value": "41,0 °C",
+         "Max": "41,0 °C",
+         "SensorId": "/nvme/0/temperature/1",
+         "Type": "Temperature",
+         "RawMin": 41.0,
+         "RawValue": 41.0,
+         "RawMax": 41.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 24,
+         "Text": "Temperature #2",
+         "Min": "45,0 °C",
+         "Value": "45,0 °C",
+         "Max": "45,0 °C",
+         "SensorId": "/nvme/0/temperature/2",
+         "Type": "Temperature",
+         "RawMin": 45.0,
+         "RawValue": 45.0,
+         "RawMax": 45.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 25,
+         "Text": "Warning Temperature",
+         "Min": "86,8 °C",
+         "Value": "86,8 °C",
+         "Max": "86,8 °C",
+         "SensorId": "/nvme/0/temperature/10",
+         "Type": "Temperature",
+         "RawMin": 86.85,
+         "RawValue": 86.85,
+         "RawMax": 86.85,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 26,
+         "Text": "Critical Temperature",
+         "Min": "89,8 °C",
+         "Value": "89,8 °C",
+         "Max": "89,8 °C",
+         "SensorId": "/nvme/0/temperature/11",
+         "Type": "Temperature",
+         "RawMin": 89.85,
+         "RawValue": 89.85,
+         "RawMax": 89.85,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": 30,
+     "Text": "WDC WDS500G2B0A",
+     "Min": "",
+     "Value": "",
+     "Max": "",
+     "HardwareId": "/hdd/1",
+     "ImageURL": "images_icon/hdd.png",
+     "Children": [
+      {
+       "id": 31,
+       "Text": "Temperatures",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/temperature.png",
+       "Children": [
+        {
+         "id": 32,
+         "Text": "Temperature",
+         "Min": "33,0 °C",
+         "Value": "33,0 °C",
+         "Max": "33,0 °C",
+         "SensorId": "/hdd/1/temperature/0",
+         "Type": "Temperature",
+         "RawMin": 33.0,
+         "RawValue": 33.0,
+         "RawMax": 33.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 33,
+         "Text": "Warning Temperature",
+         "Min": "86,8 °C",
+         "Value": "86,8 °C",
+         "Max": "86,8 °C",
+         "SensorId": "/hdd/1/temperature/10",
+         "Type": "Temperature",
+         "RawMin": 86.85,
+         "RawValue": 86.85,
+         "RawMax": 86.85,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

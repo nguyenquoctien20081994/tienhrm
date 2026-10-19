@@ -31,6 +31,8 @@ GAUGES = [
 ]
 SCALE_RANGE = {"cpu": (20, 110), "gpu": (20, 110), "board": (20, 100)}
 AMBER, RED, MUTED, TEXT = (255, 176, 32), (255, 59, 78), (110, 134, 163), (211, 230, 251)
+LEVEL_RGB = {"cool": (34, 229, 255), "normal": (61, 255, 162), "warm": AMBER, "hot": (255, 122, 46),
+             "critical": RED, "unknown": MUTED}
 START_DEG, SWEEP_DEG = 135.0, 270.0
 
 
@@ -215,8 +217,8 @@ class OverlayRenderer:
             img.alpha_composite(g.static, (ox, oy))
         return img
 
-    def render(self, items: list[dict], status: str, now: float) -> Image.Image:
-        """items[i]: {disp, value, state, name, substitute}; status: live|demo|off."""
+    def render(self, items: list[dict], status: str, now: float, verdict: dict | None = None) -> Image.Image:
+        """items[i]: {disp, value, state, substitute}; status: live|demo|off; verdict: assess.evaluate()."""
         img = self.base.copy()
         dr = ImageDraw.Draw(img)
         s = self.scale
@@ -226,8 +228,12 @@ class OverlayRenderer:
             r = 3.2 * s
             cx, cy = self.status_x, int(11 * s)
             dr.ellipse([cx - r, cy - r, cx + r, cy + r], fill=dot + (255,))
-        dr.text((self.status_x + int(7 * s), int(11 * s)), {"live": "LIVE", "demo": "DEMO"}.get(status, "NO SIGNAL"),
-                font=self.f_small, fill=dot + (255,), anchor="lm")
+        label = {"live": "LIVE", "demo": "DEMO"}.get(status, "NO SIGNAL")
+        dr.text((self.status_x + int(7 * s), int(11 * s)), label, font=self.f_small, fill=dot + (255,), anchor="lm")
+        if verdict and status != "off":  # nhận định ngắn: RẤT MÁT / BÌNH THƯỜNG / NÓNG...
+            x = self.status_x + int(7 * s) + dr.textlength(label, font=self.f_small) + int(10 * s)
+            col = LEVEL_RGB.get(verdict.get("level"), MUTED)
+            dr.text((x, int(11 * s)), verdict.get("short", ""), font=self.f_label, fill=col + (255,), anchor="lm")
 
         for i, (g, it) in enumerate(zip(self.gauges, items)):
             ox, oy = self.gauge_origin(i)
@@ -406,7 +412,8 @@ class OverlayController:
         cfg = self.settings.get()
         sensors = (snap or {}).get("sensors", [])
         by_id = {s["id"]: s for s in sensors}
-        stale = snap is None or now_wall - snap.get("ts", 0) > 6
+        # Mất tín hiệu khi quá 2 chu kỳ đo (+5 giây) không có dữ liệu mới
+        stale = snap is None or now_wall - snap.get("ts", 0) > (snap.get("interval") or 1) * 2 + 5
         status = "off" if stale else ("demo" if snap.get("mode") == "demo" else "live" if sensors else "off")
         items = []
         for g in GAUGES:
@@ -433,7 +440,8 @@ class OverlayController:
         now = time.monotonic()
         dt = min(0.1, now - getattr(self, "_last_tick", now)) or 0.04
         self._last_tick = now
-        items, status = self._items(self.get_snapshot(), time.time())
+        snap = self.get_snapshot()
+        items, status = self._items(snap, time.time())
         moving = False
         for g, it in zip(GAUGES, items):
             a = self.anim.setdefault(g["key"], {"pos": 18.0, "vel": 0.0})
@@ -447,7 +455,7 @@ class OverlayController:
                     for g, it in zip(GAUGES, items))
         from PIL import ImageTk
 
-        img = self.renderer.render(items, status, now)
+        img = self.renderer.render(items, status, now, (snap or {}).get("assessment"))
         if self.photo is None or self.photo.width() != img.width or self.photo.height() != img.height:
             self.photo = ImageTk.PhotoImage(img)
             self.label.configure(image=self.photo)

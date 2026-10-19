@@ -1,6 +1,6 @@
 # Thermal Core HUD
 
-App chạy local trên laptop, đo **nhiệt độ CPU, GPU, Mainboard** theo thời gian thực (mặc định 1 giây/lần), giao diện đồng hồ cơ kết hợp HUD gaming/viễn tưởng.
+App chạy local trên máy tính, đo **nhiệt độ CPU, GPU, Mainboard, ổ cứng** (mặc định 15 giây/lần, chỉnh được 5–60 giây), có **thanh nhận định bằng lời** cho người không chuyên, giao diện đồng hồ cơ kết hợp HUD gaming/viễn tưởng.
 
 Bản này được chỉnh cho **ThinkPad X1 Yoga Gen 5 · Intel Core i7-10610U · Intel UHD Graphics · Windows 11 Pro 25H2**, và vẫn chạy được trên các máy Windows/Linux khác.
 
@@ -38,11 +38,36 @@ Muốn xem thử giao diện mà không cần cảm biến: `ThermalCoreHUD.exe 
 
 ## 3. Giao diện
 
+### Thanh "Tình trạng nhiệt" (trên cùng)
+Nhận định bằng lời dễ hiểu kèm **điểm nhiệt 0–100** (100 = rất mát, 60 = chạm ngưỡng cảnh báo, dưới 20 = nguy hiểm):
+
+| Mức | Ví dụ thông điệp |
+|---|---|
+| ❄ Rất mát | "Máy đang rất mát mẻ – mọi thứ ổn định" / "…tản nhiệt hoạt động xuất sắc" |
+| ✓ Bình thường | "Nhiệt độ bình thường – máy hoạt động ổn định" |
+| ▲ Hơi ấm | "Máy hơi ấm – vẫn trong ngưỡng an toàn" |
+| ⚠ Nóng | "Máy đang nóng – nên giảm tải hoặc cải thiện thông gió" |
+| ⛔ Quá nhiệt | "Quá nhiệt! – hãy đóng bớt ứng dụng nặng ngay" |
+
+App không chỉ so nhiệt độ với ngưỡng mà còn **xét mức tải CPU**:
+- CPU chạy nặng mà vẫn mát → "tản nhiệt làm việc rất tốt".
+- CPU đang nghỉ mà đã nóng → "tản nhiệt có dấu hiệu kém", kèm gợi ý kiểm tra khe gió, vệ sinh quạt, thay keo tản nhiệt.
+- Nóng vì đang chạy nặng → giải thích đây là phản ứng bình thường.
+- Nhiệt tăng nhanh (≥ 4°C/phút), CPU chạm TjMax (tự giảm xung) → cảnh báo riêng.
+
+Kết luận "tản nhiệt tốt/kém" chỉ đưa ra khi có số liệu tải làm căn cứ.
+
+### Thông số phụ dưới mỗi đồng hồ
+- **CPU:** tải (%), công suất (W), xung nhịp (GHz), khoảng cách tới **TjMax** (nhiệt độ CPU tự giảm xung để bảo vệ).
+- **GPU:** tải (%); Intel iGPU ghi rõ "chung đế CPU".
+- **Mainboard/ổ cứng:** ngưỡng cảnh báo do chính nhà sản xuất ổ công bố; tốc độ quạt (RPM) nếu máy có cảm biến quạt.
+- Thanh **NEXT SCAN** đếm ngược tới lần đo kế tiếp; biểu đồ lưu 60 phút gần nhất; ô **Δ/PHÚT** cho biết nhiệt đang tăng hay giảm.
+
 - **Đồng hồ cơ**: vành thép có khía, ốc vít, mặt số vân guilloche, trục đồng gắn chân kính ruby, kim có quán tính lò xo (hơi vọt rồi dừng như đồng hồ thật).
 - **Bánh răng** sau mặt số quay nhanh dần khi nhiệt độ tăng.
 - **Mặt số phụ Δ/10s**: tốc độ tăng/giảm nhiệt trong 10 giây gần nhất.
 - Vạch tam giác **xanh/đỏ** trên vành: nhiệt độ thấp nhất/cao nhất trong phiên.
-- Biểu đồ 180 giây, các ô MIN/AVG/MAX.
+- Biểu đồ 60 phút gần nhất, các ô MIN/AVG/MAX.
 - **Cảnh báo**: vượt WARN thì thẻ chuyển màu cam; vượt CRIT thì báo động đỏ nhấp nháy, có băng cảnh báo và còi (nút `ALARM`, mặc định tắt).
 - Nút `°C/°F`, `CALIBRATE` (chỉnh ngưỡng), `⛶` (toàn màn hình).
 - **Co giãn theo cửa sổ**: 3 đồng hồ luôn nằm trên một hàng ngang. Khi thu hẹp cửa sổ, bên trong mỗi thẻ tự gọn lại theo bề rộng của thẻ: menu chọn cảm biến xuống dòng, ô số liệu chuyển thành 2 cột, rồi ẩn bớt biểu đồ.
@@ -81,6 +106,7 @@ ThermalCoreHUD.exe (hoặc python app.py)
     [--ui auto|window|browser|none] [--overlay] [--keep-running] [--version]
 ```
 
+- `--interval`: chu kỳ đo cho phiên này (mặc định lấy theo cài đặt, 15 giây; đổi lâu dài trong **CALIBRATE**).
 - `--overlay`: chỉ hiện overlay 3 đồng hồ, không mở cửa sổ chính. Có thể tạo shortcut với tham số này và đặt vào thư mục Startup (`Win + R` → `shell:startup`) để overlay tự bật khi khởi động máy.
 
 - `--no-manage-lhm`: không tự tải/bật LibreHardwareMonitor (khi anh tự quản lý LHM).
@@ -95,7 +121,7 @@ ThermalCoreHUD.exe (UAC admin) ─ tự tải, cấu hình, khởi động ─�
 LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
       │  http://127.0.0.1:8085/data.json         │ PowerShell, 5 giây/lần
       ▼                                          ▼
- app.py ── Sampler (luồng nền, 1 giây/lần) ── sensors.py (phân loại, chọn cảm biến chính, ước tính iGPU)
+ app.py ── Sampler (luồng nền, 15 giây/lần) ── sensors.py + assess.py (nhận định)
       │  Server-Sent Events /api/stream  (chỉ lắng nghe 127.0.0.1)
       ▼
  web/  (HTML + Canvas, không dùng thư viện ngoài, chạy được khi không có mạng)
@@ -108,6 +134,10 @@ LibreHardwareMonitor (admin, PawnIO)      ACPI/WMI (admin)
 - App **không bao giờ** tự chuyển sang số liệu giả khi mất cảm biến. Chế độ DEMO chỉ chạy khi gọi `--demo`, hoặc khi mở trực tiếp file HTML mà không có backend, và luôn có nhãn DEMO rõ ràng.
 
 ## 6. Xử lý sự cố
+
+> **Lenovo ThinkCentre M910q (và nhiều máy mini/văn phòng):** LibreHardwareMonitor không đọc được cảm biến mainboard của dòng này (không hỗ trợ chip giám sát của Lenovo, không có nhiệt độ PCH). App tự dùng nhiệt độ ổ SSD (nằm trên mainboard) và ghi nhãn **THAY THẾ**. Đây là giới hạn phần cứng/driver, không phải lỗi app.
+>
+> Bản ≤ 1.2 hiển thị ổ cứng **87°C đứng yên**: đó là *ngưỡng cảnh báo* (Warning/Critical Temperature) của ổ bị hiểu nhầm là nhiệt độ. Bản 1.3 đã tách ra và dùng nó làm ngưỡng cảnh báo riêng cho từng ổ.
 
 | Triệu chứng | Nguyên nhân | Cách xử lý |
 |---|---|---|

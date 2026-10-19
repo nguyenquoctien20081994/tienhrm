@@ -29,7 +29,7 @@
       <div class="pill" id="linkPill" data-state="wait"><i></i><span>CONNECTING</span></div>
       <div class="tm"><label>SOURCE</label><b id="source">—</b></div>
       <div class="tm"><label>SYSTEM</label><b id="sysState">—</b></div>
-      <div class="tm"><label>SAMPLE</label><b id="rate">—</b></div>
+      <div class="tm"><label>NEXT SCAN</label><b id="rate">—</b><i class="tm-bar"><i id="nextBar"></i></i></div>
     </div>
 
     <div class="right">
@@ -43,6 +43,19 @@
       </div>
     </div>
   </header>
+
+  <section id="verdict" class="verdict" data-level="unknown" hidden>
+    <div class="v-icon" id="vIcon">?</div>
+    <div class="v-body">
+      <div class="v-head"><span class="v-tag">// TÌNH TRẠNG NHIỆT</span><b id="vHeadline">—</b></div>
+      <p id="vDetail"></p>
+      <ul id="vTips"></ul>
+    </div>
+    <div class="v-score" title="Điểm nhiệt: 100 = rất mát, 60 = chạm ngưỡng cảnh báo, dưới 20 = nguy hiểm">
+      <svg viewBox="0 0 44 44" aria-hidden="true"><circle class="bg" r="19" cx="22" cy="22" /><circle id="vRing" class="fg" r="19" cx="22" cy="22" /></svg>
+      <b id="vScore">--</b><small>ĐIỂM NHIỆT</small>
+    </div>
+  </section>
 
   <div id="alertBar" class="alert-bar" hidden></div>
   <div id="msgBar" class="msg-bar" hidden></div>
@@ -58,7 +71,7 @@
   </section>
 
   <footer class="hud-foot">
-    <span>THERMAL CORE HUD v1.0</span>
+    <span id="footVersion">THERMAL CORE HUD</span>
     <span id="footInfo">Chỉ chạy trên máy này (127.0.0.1) · không gửi dữ liệu ra ngoài</span>
   </footer>
 
@@ -66,6 +79,12 @@
     <form method="dialog">
       <h3><span>//</span> CALIBRATION</h3>
       <p>Ngưỡng cảnh báo theo °C. Vượt ngưỡng <b class="amber">WARN</b> thẻ chuyển cam, vượt <b class="red">CRIT</b> báo động đỏ.</p>
+      <label class="settings-interval">Chu kỳ đo nhiệt độ
+        <select id="selInterval">
+          <option value="5">5 giây</option><option value="10">10 giây</option><option value="15">15 giây (khuyên dùng)</option>
+          <option value="30">30 giây</option><option value="60">60 giây</option>
+        </select>
+      </label>
       <div id="settingsRows" class="settings-rows"></div>
       <div class="settings-actions">
         <button type="button" id="btnReset">MẶC ĐỊNH</button>
@@ -86,9 +105,10 @@
         <div><label>MIN</label><b class="s-min">--</b></div>
         <div><label>AVG</label><b class="s-avg">--</b></div>
         <div><label>MAX</label><b class="s-max">--</b></div>
-        <div><label>Δ 10s</label><b class="s-trend">--</b></div>
+        <div><label>Δ/PHÚT</label><b class="s-trend">--</b></div>
       </div>
       <canvas class="spark"></canvas>
+      <div class="tele"></div>
       <div class="card-foot"><span class="hw">—</span><span class="state">STANDBY</span></div>
     </section>
   </template>

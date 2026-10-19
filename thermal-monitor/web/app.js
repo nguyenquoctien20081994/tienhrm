@@ -11,8 +11,8 @@
     { key: "board", code: "03", title: "MAINBOARD", min: 20, max: 100, warn: 65, crit: 80, accent: "#3dffa2" },
   ];
   const COLORS = { amber: "#ffb020", red: "#ff3b4e", text: "#d3e6fb", muted: "#6e86a3" };
-  const HISTORY_SEC = 180;
-  const STALE_MS = 6000;
+  const HISTORY_SEC = 3600;  // biểu đồ giữ 60 phút gần nhất
+  const LEVEL_COLOR = { cool: "#22e5ff", normal: "#3dffa2", warm: "#ffb020", hot: "#ff7a2e", critical: "#ff3b4e", unknown: "#6e86a3" };
   const CAT_LABEL = { cpu: "CPU", gpu: "GPU", board: "MAINBOARD / EC", storage: "STORAGE", other: "OTHER" };
   const FONT_UI = '"Bahnschrift", "Rajdhani", "Segoe UI", sans-serif';
   const FONT_MONO = '"Cascadia Mono", "Consolas", "JetBrains Mono", monospace';
@@ -24,6 +24,7 @@
 
   const settings = {
     unit: store.get("unit", "C"),
+    interval: 15,
     sound: false,
     thresholds: store.get("thresholds", {}),
     picks: store.get("picks", {}),
@@ -48,6 +49,7 @@
       if (!r.ok) return;
       const s = await r.json();
       settings.unit = s.unit === "F" ? "F" : "C";
+      settings.interval = s.interval || 15;
       settings.picks = s.picks || {};
       settings.thresholds = s.thresholds || {};
       for (const g of GAUGES) {
@@ -82,7 +84,7 @@
 
   // ------------------------------------------------------------------ trạng thái
   const state = {
-    snap: null, lastDataAt: 0, everLive: false, sensorKey: "", demo: false,
+    snap: null, lastDataAt: 0, lastDataWall: 0, everLive: false, sensorKey: "", demo: false,
   };
 
   const gauges = GAUGES.map((cfg) => {
@@ -223,7 +225,7 @@
       f.strokeStyle = i < 5 ? "#5ad1ff" : i > 5 ? "#ff8a5a" : "#e3eefa"; f.lineWidth = Math.max(1, R * 0.006); f.stroke();
     }
     f.font = `${R * 0.04}px ${FONT_MONO}`; f.fillStyle = COLORS.muted; f.textAlign = "center";
-    if (R >= 95 * g.dpr) f.fillText("Δ/10s", sx, sy + sr * 0.55);
+    if (R >= 95 * g.dpr) f.fillText("Δ/min", sx, sy + sr * 0.55);
 
     // Cửa sổ hiển thị số
     const wx = -R * 0.29, wy = R * 0.3, ww = R * 0.58, wh = R * 0.2;
@@ -388,13 +390,16 @@
     return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
   }
 
+  // °C mỗi phút, so với điểm đo cách ít nhất 45 giây
   function trendOf(g) {
     if (g.hist.length < 2) return null;
     const last = g.hist[g.hist.length - 1];
-    const ref = g.hist.find((p) => last.t - p.t <= 10000) || g.hist[0];
-    if (last.t === ref.t) return null;
-    return ((last.v - ref.v) * 10000) / (last.t - ref.t);
+    const older = g.hist.filter((p) => last.t - p.t >= 45000);
+    const ref = older[older.length - 1];
+    if (!ref) return null;
+    return ((last.v - ref.v) * 60000) / (last.t - ref.t);
   }
+  const staleMs = () => (state.snap?.interval || 1) * 2000 + 5000;
 
   function drawSpark(g) {
     const c = g.spark, dpr = window.devicePixelRatio || 1;
@@ -411,7 +416,8 @@
     let lo = Math.min(...pts.map((p) => p.v)), hi = Math.max(...pts.map((p) => p.v));
     if (hi - lo < 8) { const m = (hi + lo) / 2; lo = m - 4; hi = m + 4; }
     lo -= 1; hi += 1;
-    const tEnd = pts[pts.length - 1].t, span = HISTORY_SEC * 1000;
+    const tEnd = pts[pts.length - 1].t;
+    const span = Math.min(HISTORY_SEC * 1000, Math.max(5 * 60000, tEnd - pts[0].t));  // 5 → 60 phút
     const X = (t) => W - ((tEnd - t) / span) * W;
     const Y = (v) => H - ((v - lo) / (hi - lo)) * H;
 
@@ -433,7 +439,7 @@
     const lp = pts[pts.length - 1];
     x.beginPath(); x.arc(X(lp.t), Y(lp.v), 3 * dpr, 0, Math.PI * 2); x.fillStyle = "#fff"; x.fill();
     x.font = `${10 * dpr}px ${FONT_MONO}`; x.fillStyle = COLORS.muted; x.textBaseline = "top";
-    x.fillText(`${HISTORY_SEC}s`, 4 * dpr, 3 * dpr);
+    x.fillText(`${Math.round(span / 60000)} phút`, 4 * dpr, 3 * dpr);
     x.textAlign = "right"; x.fillText(`${fmt(hi, 0)}°`, W - 4 * dpr, 3 * dpr);
     x.textBaseline = "bottom"; x.fillText(`${fmt(lo, 0)}°`, W - 4 * dpr, H - 2 * dpr);
     x.textAlign = "left";
@@ -473,7 +479,7 @@
   function applySnapshot(snap, fromPicker = false) {
     state.snap = snap;
     const now = performance.now();
-    if (!fromPicker) state.lastDataAt = now;
+    if (!fromPicker) { state.lastDataAt = now; state.lastDataWall = Date.now(); }
     rebuildPickers(snap);
 
     for (const g of gauges) {
@@ -481,7 +487,8 @@
       g.sensor = s;
       g.stale = false;
       g.target = s ? s.value : null;
-      const autoName = s ? `${s.name}` : "—";
+      // Cảm biến thay thế (vd. ổ SSD cho mục MAINBOARD): ghi tên thiết bị cho dễ hiểu
+      const autoName = !s ? "—" : s.category !== g.cfg.key && s.category === "storage" ? `Ổ ${s.hardware}` : s.name;
       const autoOpt = g.pick.querySelector('option[value="auto"]');
       if (autoOpt) autoOpt.textContent = `AUTO · ${autoName}`;
       const substitute = s && s.category !== g.cfg.key ? "THAY THẾ · " : "";
@@ -498,6 +505,9 @@
       updateCardText(g);
     }
     updateHeader(snap);
+    renderVerdict(snap.assessment);
+    if (snap.version) $("#footVersion").textContent = `THERMAL CORE HUD v${snap.version}`;
+    renderTele(snap);
     renderBank(snap);
     checkAlarm();
   }
@@ -531,7 +541,6 @@
     $("span", pill).textContent = state.demo || snap.mode === "demo" ? "DEMO" : live ? "LIVE" : snap.mode === "nosensor" ? "NO SENSOR" : "ERROR";
     $("#source").textContent = snap.source || "—";
     $("#source").title = snap.source || "";
-    $("#rate").textContent = `${(snap.interval || 1).toFixed(2)}s · ${snap.readMs ?? 0}ms`;
     const lv = gauges.map((g) => g.level);
     const sys = lv.includes("crit") ? "CRITICAL" : lv.includes("warn") ? "ELEVATED" : lv.includes("ok") ? "NOMINAL" : "STANDBY";
     const sysEl = $("#sysState");
@@ -549,12 +558,62 @@
     ab.textContent = hot.length ? `▲ OVERHEAT WARNING ▲  ${hot.map((g) => `${g.cfg.title} ${fmt(g.target)}°${settings.unit}`).join("  ·  ")}` : "";
   }
 
+  // ---- thanh nhận định tình trạng nhiệt (do app tính, xem assess.py)
+  function renderVerdict(a) {
+    const box = $("#verdict");
+    box.hidden = !a;
+    if (!a) return;
+    box.dataset.level = a.level;
+    box.style.setProperty("--lv", LEVEL_COLOR[a.level] || LEVEL_COLOR.unknown);
+    $("#vIcon").textContent = a.icon;
+    $("#vHeadline").textContent = a.headline;
+    $("#vDetail").textContent = a.detail;
+    $("#vTips").innerHTML = (a.tips || []).map((t) => `<li>${esc(t)}</li>`).join("");
+    $("#vScore").textContent = a.score ?? "--";
+    const ring = $("#vRing"), len = 2 * Math.PI * 19;
+    ring.style.strokeDasharray = `${len}`;
+    ring.style.strokeDashoffset = `${len * (1 - (a.score ?? 0) / 100)}`;
+  }
+
+  // ---- thông số phụ dưới mỗi đồng hồ: tải, công suất, xung, khoảng cách tới TjMax, quạt...
+  function renderTele(snap) {
+    const m = snap.metrics || {};
+    const chip = (label, value, title = "") => `<span title="${esc(title)}"><i>${label}</i>${esc(value)}</span>`;
+    for (const g of gauges) {
+      const s = g.sensor, out = [];
+      if (g.cfg.key === "cpu") {
+        if (m.cpu_load != null) out.push(chip("TẢI", `${Math.round(m.cpu_load)}%`, "Mức sử dụng CPU"));
+        if (m.cpu_power != null) out.push(chip("CÔNG SUẤT", `${m.cpu_power.toFixed(1)} W`, "Điện năng CPU tiêu thụ"));
+        if (m.cpu_clock != null) out.push(chip("XUNG", `${(m.cpu_clock / 1000).toFixed(2)} GHz`, "Xung nhịp trung bình các nhân"));
+        if (m.tjmax != null && s?.value != null) out.push(chip("CÁCH TjMax", `${Math.round(m.tjmax - s.value)}°`,
+          `TjMax ${m.tjmax}°C: nhiệt độ mà CPU tự giảm xung để bảo vệ`));
+      } else if (g.cfg.key === "gpu") {
+        if (s?.id === "derived/igpu") out.push(chip("iGPU", "chung đế CPU", "Intel iGPU không có cảm biến riêng"));
+        if (m.gpu_load != null) out.push(chip("TẢI", `${Math.round(m.gpu_load)}%`, "Mức sử dụng GPU"));
+      } else {
+        if (s?.warn != null) out.push(chip("NGƯỠNG Ổ", `${fmt(s.warn, 0)}°`, "Ngưỡng cảnh báo do nhà sản xuất ổ công bố"));
+        for (const f of (m.fans || []).slice(0, 2)) out.push(chip("QUẠT", `${f.rpm} RPM`, `${f.name} · ${f.hardware}`));
+      }
+      $(".tele", g.el).innerHTML = out.join("");
+    }
+  }
+
+  // ---- đếm ngược tới lần đo kế tiếp
+  function tickCountdown() {
+    if (!state.lastDataWall) return;
+    const iv = (state.snap?.interval || 1) * 1000;
+    const left = Math.max(0, iv - (Date.now() - state.lastDataWall));
+    $("#rate").textContent = `${Math.ceil(left / 1000)}s / ${Math.round(iv / 1000)}s`;
+    $("#nextBar").style.width = `${100 - (left / iv) * 100}%`;
+  }
+
   let bankKey = "";
   function renderBank(snap) {
     const bank = $("#bank");
     const sensors = snap.sensors || [];
     $("#bankCount").textContent = `${sensors.length} sensors`;
-    const key = sensors.map((s) => s.id).join("|");
+    const fans = snap.metrics?.fans || [];
+    const key = sensors.map((s) => s.id).join("|") + "#" + fans.map((f) => f.name + f.hardware).join("|");
     if (key !== bankKey) {
       bankKey = key;
       if (!sensors.length) { bank.innerHTML = `<p class="empty">Chưa có cảm biến nào. Xem thông báo phía trên để biết cách khắc phục.</p>`; return; }
@@ -563,14 +622,20 @@
       bank.innerHTML = Object.keys(CAT_LABEL).filter((c) => byCat[c]).map((c) => `
         <div class="bank-group"><h3>${CAT_LABEL[c]}</h3><div class="bank-row">
         ${byCat[c].map((s) => `<div class="chip" data-id="${esc(s.id)}"><div class="n"><span>${esc(s.name)}</span><b>--</b></div>
-          <small title="${esc(s.hardware)}">${esc(s.hardware)}</small><i class="bar"></i></div>`).join("")}
-        </div></div>`).join("");
+          <small title="${esc(s.hardware)}">${esc(s.hardware)}${s.warn != null ? ` · ngưỡng ${fmt(s.warn, 0)}°` : ""}</small><i class="bar"></i></div>`).join("")}
+        </div></div>`).join("") + (fans.length ? `
+        <div class="bank-group"><h3>FANS</h3><div class="bank-row">
+        ${fans.map((f, i) => `<div class="chip" data-fan="${i}"><div class="n"><span>${esc(f.name)}</span><b>--</b></div>
+          <small title="${esc(f.hardware)}">${esc(f.hardware)}</small><i class="bar"></i></div>`).join("")}
+        </div></div>` : "");
     }
     const chips = new Map([...bank.querySelectorAll(".chip")].map((el) => [el.dataset.id, el]));
     for (const s of sensors) {
       const el = chips.get(s.id);
       if (!el) continue;
-      const ref = GAUGES.find((g) => g.key === s.category) || GAUGES[2];
+      // Ổ cứng: dùng ngưỡng của chính nhà sản xuất ổ nếu có
+      const ref = s.warn != null ? { warn: s.warn, crit: s.crit ?? s.warn + 5, accent: GAUGES[2].accent }
+        : GAUGES.find((g) => g.key === s.category) || GAUGES[2];
       const col = s.value == null ? COLORS.muted : colorOf(ref, s.value);
       const b = $("b", el);
       b.textContent = s.value == null ? "--" : `${fmt(s.value)}°`;
@@ -580,6 +645,12 @@
       bar.style.background = col;
       bar.style.color = col;
     }
+    fans.forEach((f, i) => {
+      const el = bank.querySelector(`.chip[data-fan="${i}"]`);
+      if (!el) return;
+      $("b", el).textContent = `${f.rpm} RPM`;
+      $(".bar", el).style.width = `${clamp(f.rpm / 5000, 0, 1) * 100}%`;
+    });
   }
 
   // ------------------------------------------------------------------ còi cảnh báo
@@ -608,7 +679,7 @@
   function frame(now) {
     const dt = Math.min(0.05, (now - lastFrame) / 1000);
     lastFrame = now;
-    const stale = state.lastDataAt && now - state.lastDataAt > STALE_MS;
+    const stale = state.lastDataAt && now - state.lastDataAt > staleMs();
     for (const g of gauges) {
       if (stale && !g.stale) { g.stale = true; updateCardText(g); }
       const target = g.target != null && !g.stale ? g.target : g.cfg.min - 2;
@@ -699,7 +770,7 @@
           `<input type="number" step="1" min="30" max="125" data-k="${g.key}" data-f="crit" value="${v.crit}">`;
       }).join("");
   }
-  $("#btnSettings").onclick = () => { fillSettings(); dlg.showModal(); };
+  $("#btnSettings").onclick = () => { fillSettings(); $("#selInterval").value = String(settings.interval); dlg.showModal(); };
   $("#btnReset").onclick = () => fillSettings(true);
   dlg.addEventListener("close", () => {
     if (dlg.returnValue !== "save") return;
@@ -710,7 +781,8 @@
       settings.thresholds[g.key] = { warn: g.warn, crit: g.crit };
     }
     store.set("thresholds", settings.thresholds);
-    saveServer({ thresholds: settings.thresholds });
+    settings.interval = Number($("#selInterval").value) || 15;
+    saveServer({ thresholds: settings.thresholds, interval: settings.interval });
     rebuildAll();
   });
 
@@ -721,6 +793,7 @@
     $("#date").textContent = d.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }).toUpperCase();
   }
   clockTick(); setInterval(clockTick, 1000);
+  setInterval(tickCountdown, 500);
   setInterval(() => { for (const g of gauges) drawSpark(g); }, 500);
 
   let resizeTimer;

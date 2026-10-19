@@ -24,10 +24,11 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
+import assess
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
 FROZEN = getattr(sys, "frozen", False)
@@ -46,8 +47,10 @@ for _stream in (sys.stdout, sys.stderr):
             pass
 
 
+INTERVAL_CHOICES = (5, 10, 15, 30, 60)
 DEFAULT_SETTINGS = {
     "unit": "C",
+    "interval": 15,  # giây giữa 2 lần đọc cảm biến
     # Ngưỡng cho ThinkPad X1 Yoga Gen 5 (i7-10610U, TjMax 100 °C; iGPU chung đế với CPU)
     "thresholds": {"cpu": {"warn": 85, "crit": 95}, "gpu": {"warn": 85, "crit": 95},
                    "board": {"warn": 65, "crit": 80}},
@@ -84,6 +87,10 @@ def validate_settings_patch(patch) -> dict:
         if patch["unit"] not in ("C", "F"):
             raise ValueError("unit phải là C hoặc F")
         out["unit"] = patch["unit"]
+    if "interval" in patch:
+        if patch["interval"] not in INTERVAL_CHOICES:
+            raise ValueError(f"interval phải là một trong {INTERVAL_CHOICES}")
+        out["interval"] = patch["interval"]
     if "thresholds" in patch:
         th = patch["thresholds"]
         if not isinstance(th, dict):
@@ -164,34 +171,56 @@ def resource_dir() -> str:
 class Sampler:
     """Đọc cảm biến theo chu kỳ trong một luồng riêng, phát snapshot mới cho các client SSE."""
 
-    def __init__(self, provider, interval: float, status_fn=None, extra_fn=None):
+    HISTORY_SEC = 600  # lịch sử ngắn để tính tốc độ tăng nhiệt cho phần nhận định
+
+    def __init__(self, provider, interval_fn, settings_fn, status_fn=None, extra_fn=None):
         self.provider = provider
-        self.extra_fn = extra_fn  # trường bổ sung cho snapshot (vd. trạng thái overlay)
-        self.interval = interval
+        self.interval_fn = interval_fn  # đọc lại mỗi vòng -> đổi chu kỳ trong CALIBRATE có hiệu lực ngay
+        self.settings_fn = settings_fn
         self.status_fn = status_fn  # trả về thông báo trạng thái (vd. đang tải LHM) hoặc None
+        self.extra_fn = extra_fn  # trường bổ sung cho snapshot (vd. trạng thái overlay)
         self.cond = threading.Condition()
+        self.wake = threading.Event()
         self.seq = 0
         self.latest: dict | None = None
         self.clients = 0
         self.had_client = False
         self.idle_since = time.monotonic()
+        self.history: dict[str, list] = {}
 
     def start(self) -> None:
         threading.Thread(target=self._loop, daemon=True).start()
 
+    def _remember(self, snap: dict) -> None:
+        now = snap["ts"]
+        for s in snap.get("sensors", []):
+            if s.get("value") is None:
+                continue
+            h = self.history.setdefault(s["id"], [])
+            h.append((now, s["value"]))
+            while h and now - h[0][0] > self.HISTORY_SEC:
+                h.pop(0)
+
     def _loop(self) -> None:
         while True:
             started = time.monotonic()
+            interval = self.interval_fn()
             try:
                 snap = sensors.snapshot(self.provider.read())
             except Exception as exc:  # noqa: BLE001 - lỗi đọc không được làm dừng vòng lặp
-                snap = {"ts": time.time(), "source": "—", "mode": "error", "sensors": [],
+                snap = {"ts": time.time(), "source": "—", "mode": "error", "sensors": [], "metrics": {},
                         "primary": {}, "messages": [f"Lỗi đọc cảm biến: {exc}"]}
             status = self.status_fn() if self.status_fn else None
             if status:
                 # Trong lúc đang chuẩn bị LHM, lỗi "không kết nối được LHM" là điều đương nhiên -> ẩn đi
                 snap["messages"] = [status] + [m for m in snap["messages"] if "LibreHardwareMonitor" not in m]
-            snap["interval"] = self.interval
+            self._remember(snap)
+            try:
+                snap["assessment"] = assess.evaluate(snap, self.settings_fn(), self.history)
+            except Exception as exc:  # noqa: BLE001 - nhận định lỗi không được làm mất số liệu
+                snap["assessment"] = None
+                print("Lỗi nhận định:", exc)
+            snap["interval"] = interval
             snap["readMs"] = round((time.monotonic() - started) * 1000)
             snap["version"] = APP_VERSION
             if self.extra_fn:
@@ -200,7 +229,8 @@ class Sampler:
                 self.seq += 1
                 self.latest = snap
                 self.cond.notify_all()
-            time.sleep(max(0.05, self.interval - (time.monotonic() - started)))
+            self.wake.wait(max(0.05, interval - (time.monotonic() - started)))
+            self.wake.clear()
 
     def wait_next(self, last_seq: int, timeout: float) -> tuple[int, dict | None]:
         with self.cond:
@@ -386,7 +416,8 @@ def fatal(msg: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Thermal Core HUD – theo dõi nhiệt độ CPU/GPU/Mainboard realtime")
     ap.add_argument("--port", type=int, default=8787, help="cổng giao diện (mặc định 8787)")
-    ap.add_argument("--interval", type=float, default=1.0, help="chu kỳ đọc cảm biến, giây (mặc định 1.0)")
+    ap.add_argument("--interval", type=float, default=None,
+                    help="chu kỳ đọc cảm biến, giây (mặc định theo cài đặt, 15 giây; chỉnh trong CALIBRATE)")
     ap.add_argument("--demo", action="store_true", help="dùng dữ liệu mô phỏng")
     ap.add_argument("--lhm-url", default=None,
                     help=f"địa chỉ data.json của LibreHardwareMonitor (mặc định trên Windows: {DEFAULT_LHM_URL})")
@@ -412,7 +443,6 @@ def main() -> None:
             open_ui(url, args.ui)
         return
 
-    interval = min(10.0, max(0.25, args.interval))
     manager = None
     if args.demo:
         provider = sensors.DemoAuto()
@@ -450,8 +480,14 @@ def main() -> None:
     else:
         print("Overlay tắt: không có màn hình đồ hoạ hoặc thiếu tkinter/Pillow.")
 
-    sampler = Sampler(provider, interval, status_fn=(lambda: manager.status) if manager else None,
+    def interval() -> float:
+        if args.interval:  # tham số dòng lệnh chỉ áp dụng cho phiên này
+            return min(300.0, max(0.5, args.interval))
+        return float(store.get()["interval"])
+
+    sampler = Sampler(provider, interval, store.get, status_fn=(lambda: manager.status) if manager else None,
                       extra_fn=lambda: {"overlay": None if ctl is None else ctl.visible})
+    store.listeners.append(lambda patch: "interval" in patch and sampler.wake.set())  # đo lại ngay theo chu kỳ mới
     sampler.start()
 
     # Chỉ lắng nghe 127.0.0.1: máy khác trong mạng không truy cập được.

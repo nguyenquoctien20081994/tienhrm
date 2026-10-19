@@ -39,6 +39,8 @@ class Sensor:
     value: float | None
     min: float | None = None
     max: float | None = None
+    warn: float | None = None   # ngưỡng do nhà sản xuất công bố (vd. ổ SSD), nếu có
+    crit: float | None = None
 
 
 @dataclass
@@ -47,6 +49,7 @@ class Reading:
     source: str
     mode: str = "live"  # live | demo | nosensor
     messages: list[str] = field(default_factory=list)
+    metrics: dict = field(default_factory=dict)  # tải, công suất, xung nhịp, quạt, TjMax...
 
 
 def _round(v: float | None) -> float | None:
@@ -87,7 +90,11 @@ def pick_primary(sensors: list[Sensor]) -> dict[str, str | None]:
         live = [s for s in cands if s.value is not None]
         pool = live or cands
         chosen = None
-        for pref in _PRIMARY_PREFS[cat]:
+        if cat == "board" and pool and pool[0].category == "storage":
+            # Nhiệt độ tổng của ổ (không phải cảm biến phụ "Temperature #n")
+            chosen = next((s for s in pool if s.name.lower() in ("temperature", "composite temperature", "composite")),
+                          None)
+        for pref in ([] if chosen else _PRIMARY_PREFS[cat]):
             chosen = next((s for s in pool if pref in s.name.lower()), None)
             if chosen:
                 break
@@ -158,34 +165,55 @@ def _classify(hints: list[str]) -> str:
     return "other"
 
 
-def parse_lhm_tree(root: dict) -> list[Sensor]:
+_NUM_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
+_UNIT_TYPES = [("°C", "temperature"), ("°F", "temperature"), ("%", "load"), ("RPM", "fan"),
+               ("MHz", "clock"), ("GHz", "clock"), (" W", "power")]
+# Ổ cứng công bố ngưỡng cố định dưới dạng "cảm biến" nhiệt độ -> không phải nhiệt độ đo được
+_LIMIT_RE = re.compile(r"warning temperature|critical temperature|threshold|temperature limit", re.I)
+TEMP_VALID = (-30.0, 150.0)  # ngoài khoảng này coi như cảm biến lỗi
+
+
+def _num(node: dict, key: str) -> float | None:
+    raw = node.get("Raw" + key)
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return float(raw)
+    m = _NUM_RE.search(str(node.get(key) or ""))
+    return float(m.group(0).replace(",", ".")) if m else None
+
+
+def _plausible(v: float | None) -> float | None:
+    return v if v is not None and TEMP_VALID[0] < v < TEMP_VALID[1] else None
+
+
+def _leaf_type(node: dict) -> str:
+    stype = str(node.get("Type", "")).lower()
+    if stype:
+        return stype
+    text = str(node.get("Value") or "")
+    return next((t for unit, t in _UNIT_TYPES if unit in text), "")
+
+
+def parse_lhm(root: dict) -> tuple[list[Sensor], dict]:
+    """Đọc cây data.json của LibreHardwareMonitor -> (cảm biến nhiệt độ, thông số phụ)."""
     sensors: list[Sensor] = []
+    leaves: list[tuple[str, str, str, str, dict]] = []  # (loại, tên, phần cứng, nhóm, node)
+    limits: dict[str, dict] = {}
 
     def is_group(node: dict) -> bool:
         return str(node.get("Text", "")).strip().lower() in _GROUP_NAMES and not node.get("HardwareId")
 
-    def walk(node: dict, hw_path: list[str], hw_hints: list[str], depth: int) -> None:
+    def walk(node: dict, hw_path: list[str], hw_hints: list, depth: int) -> None:
         children = node.get("Children") or []
         if not children:
-            stype = str(node.get("Type", "")).lower()
-            value_text = node.get("Value")
-            is_temp = stype == "temperature" or (stype == "" and _VALUE_RE.search(str(value_text or "")))
-            if not is_temp:
+            stype = _leaf_type(node)
+            if not stype:
                 return
             name = str(node.get("Text", "?"))
-            if "distance to tjmax" in name.lower():  # là khoảng cách tới ngưỡng, không phải nhiệt độ
-                return
             hardware = " / ".join(hw_path) or "Unknown"
-            sid = node.get("SensorId") or f"lhm:{hardware}/{name}"
             category = _classify([str(node.get("SensorId", ""))] + [h for hw in hw_hints for h in hw])
             if category == "other" and name.lower().startswith(("cpu", "core")):
                 category = "cpu"
-            sensors.append(Sensor(
-                id=str(sid), name=name, hardware=hardware, category=category,
-                value=_round(_raw_or_text(node, "Value")),
-                min=_round(_raw_or_text(node, "Min")),
-                max=_round(_raw_or_text(node, "Max")),
-            ))
+            leaves.append((stype, name, hardware, category, node))
             return
         path, hints = hw_path, hw_hints
         # depth 0 = "Sensor" (gốc), depth 1 = tên máy tính -> không đưa vào đường dẫn phần cứng
@@ -197,7 +225,64 @@ def parse_lhm_tree(root: dict) -> list[Sensor]:
             walk(child, path, hints, depth + 1)
 
     walk(root, [], [], 0)
-    return sensors
+
+    distances: dict[str, float] = {}
+    for stype, name, hardware, category, node in leaves:
+        if stype != "temperature":
+            continue
+        lname = name.lower()
+        if "distance to tjmax" in lname:  # khoảng cách tới ngưỡng, không phải nhiệt độ
+            v = _raw_or_text(node, "Value")
+            if v is not None:
+                distances[name[: lname.index(" distance")]] = v
+            continue
+        if _LIMIT_RE.search(name):
+            v = _raw_or_text(node, "Value")
+            key = "crit" if "critical" in lname else "warn"
+            if v is not None:
+                limits.setdefault(hardware, {})[key] = v
+            continue
+        sid = node.get("SensorId") or f"lhm:{hardware}/{name}"
+        sensors.append(Sensor(
+            id=str(sid), name=name, hardware=hardware, category=category,
+            value=_round(_plausible(_raw_or_text(node, "Value"))),
+            min=_round(_plausible(_raw_or_text(node, "Min"))),
+            max=_round(_plausible(_raw_or_text(node, "Max"))),
+        ))
+    for s in sensors:
+        lim = limits.get(s.hardware)
+        if lim:
+            s.warn, s.crit = _round(lim.get("warn")), _round(lim.get("crit"))
+
+    metrics: dict = {"fans": []}
+    clocks = []
+    for stype, name, hardware, category, node in leaves:
+        v = _num(node, "Value")
+        lname = name.lower()
+        if v is None:
+            continue
+        if stype == "load" and category == "cpu" and lname in ("cpu total", "total"):
+            metrics["cpu_load"] = round(v, 1)
+        elif stype == "power" and category == "cpu" and lname in ("cpu package", "package"):
+            metrics["cpu_power"] = round(v, 1)
+        elif stype == "clock" and category == "cpu" and re.match(r"(cpu )?core #\d+$", lname):
+            clocks.append(v)
+        elif stype == "load" and category == "gpu" and lname in ("gpu core", "d3d 3d"):
+            metrics.setdefault("gpu_load", round(v, 1))
+        elif stype == "fan" and v > 0:
+            metrics["fans"].append({"name": name, "hardware": hardware, "rpm": round(v)})
+    if clocks:
+        metrics["cpu_clock"] = round(sum(clocks) / len(clocks))
+    # TjMax = nhiệt độ lõi + khoảng cách tới TjMax của chính lõi đó
+    by_name = {s.name: s.value for s in sensors if s.category == "cpu"}
+    tj = [by_name[n] + d for n, d in distances.items() if by_name.get(n) is not None]
+    if tj:
+        metrics["tjmax"] = round(max(tj))
+    return sensors, metrics
+
+
+def parse_lhm_tree(root: dict) -> list[Sensor]:
+    return parse_lhm(root)[0]
 
 
 class LhmHttpProvider:
@@ -210,11 +295,11 @@ class LhmHttpProvider:
         if auth:
             self.headers["Authorization"] = "Basic " + base64.b64encode(auth.encode()).decode()
 
-    def read(self) -> list[Sensor]:
+    def read(self) -> tuple[list[Sensor], dict]:
         req = urllib.request.Request(self.url, headers=self.headers)
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             data = json.loads(resp.read().decode("utf-8-sig"))
-        return parse_lhm_tree(data)
+        return parse_lhm(data)
 
 
 # ---------------------------------------------------------------------------
@@ -351,11 +436,44 @@ def _read_text(path: str) -> str | None:
         return None
 
 
+class LinuxCpuLoad:
+    """% CPU bận giữa hai lần đọc /proc/stat."""
+
+    def __init__(self, path: str = "/proc/stat"):
+        self.path = path
+        self.prev: tuple[int, int] | None = None
+
+    def read(self) -> float | None:
+        line = (_read_text(self.path) or "").splitlines()[:1]
+        if not line or not line[0].startswith("cpu "):
+            return None
+        vals = [int(x) for x in line[0].split()[1:]]
+        idle, total = vals[3] + (vals[4] if len(vals) > 4 else 0), sum(vals)
+        prev, self.prev = self.prev, (idle, total)
+        if prev is None or total == prev[1]:
+            return None
+        return round(100 * (1 - (idle - prev[0]) / (total - prev[1])), 1)
+
+
 class LinuxHwmonProvider:
     name = "Linux hwmon"
 
     def __init__(self, root: str = "/sys/class/hwmon"):
         self.root = root
+
+    def fans(self) -> list[dict]:
+        out = []
+        for hw in sorted(glob.glob(os.path.join(self.root, "hwmon*"))):
+            chip = _read_text(os.path.join(hw, "name")) or os.path.basename(hw)
+            for inp in sorted(glob.glob(os.path.join(hw, "fan*_input"))):
+                try:
+                    rpm = int(_read_text(inp) or "0")
+                except ValueError:
+                    continue
+                if rpm > 0:
+                    base = inp[: -len("_input")]
+                    out.append({"name": _read_text(base + "_label") or os.path.basename(base), "hardware": chip, "rpm": rpm})
+        return out
 
     def read(self) -> list[Sensor]:
         sensors = []
@@ -387,10 +505,17 @@ class DemoProvider:
     def __init__(self):
         self.t0 = time.time()
         self.state = {"cpu": 48.0, "gpu": 44.0, "board": 41.0, "nvme": 38.0}
+        self.load = 0.3
+
+    def metrics(self) -> dict:
+        return {"cpu_load": round(self.load * 100, 1), "cpu_power": round(4 + 36 * self.load, 1),
+                "cpu_clock": round(1800 + 2600 * self.load), "gpu_load": round(max(0.0, self.state["gpu"] - 40) * 2, 1),
+                "tjmax": 100, "fans": [{"name": "CPU Fan", "hardware": "Demo", "rpm": round(1500 + 3200 * self.load)}]}
 
     def read(self) -> list[Sensor]:
         t = time.time() - self.t0
-        load = 0.5 + 0.5 * math.sin(t / 17) * math.sin(t / 5.3)  # 0..1, có các đợt tải
+        load = 0.5 + 0.5 * math.sin(t / 170) * math.sin(t / 53)  # 0..1, các đợt tải (chu kỳ phút)
+        self.load = load
         targets = {"cpu": 42 + 52 * load, "gpu": 40 + 40 * max(0.0, math.sin(t / 23)),
                    "board": 38 + 12 * load, "nvme": 36 + 8 * load}
         speed = {"cpu": 0.35, "gpu": 0.15, "board": 0.05, "nvme": 0.05}
@@ -406,7 +531,8 @@ class DemoProvider:
                    _round(self.state["gpu"] + 9)),
             Sensor("demo/board/sys", "Motherboard", "Embedded Controller (demo)", "board", _round(self.state["board"])),
             Sensor("demo/board/pch", "PCH", "Embedded Controller (demo)", "board", _round(self.state["board"] + 6)),
-            Sensor("demo/nvme", "Composite", "Samsung SSD 980 1TB (demo)", "storage", _round(self.state["nvme"])),
+            Sensor("demo/nvme", "Temperature", "Samsung SSD 980 1TB (demo)", "storage", _round(self.state["nvme"]),
+                   warn=82.0, crit=85.0),
         ]
         return sensors
 
@@ -422,15 +548,17 @@ class AutoProvider:
         self.hwmon = LinuxHwmonProvider() if sys.platform.startswith("linux") else None
         self.nvsmi = NvidiaSmiProvider()
         self.acpi = WindowsAcpiProvider() if is_windows else None
+        self.cpu_load = LinuxCpuLoad() if sys.platform.startswith("linux") else None
 
     def read(self) -> Reading:
         sensors: list[Sensor] = []
         sources: list[str] = []
         messages: list[str] = []
+        metrics: dict = {"fans": []}
 
         if self.lhm:
             try:
-                got = self.lhm.read()
+                got, metrics = self.lhm.read()
                 sensors += got
                 sources.append(self.lhm.name)
                 if not got:
@@ -445,6 +573,11 @@ class AutoProvider:
             if got:
                 sensors += got
                 sources.append(self.hwmon.name)
+            metrics["fans"] += self.hwmon.fans()
+        if self.cpu_load:
+            load = self.cpu_load.read()
+            if load is not None:
+                metrics.setdefault("cpu_load", load)
 
         has_gpu = any(s.category == "gpu" and s.value is not None for s in sensors)
         if not has_gpu and self.nvsmi.available:
@@ -467,7 +600,8 @@ class AutoProvider:
         mode = "live" if sensors else "nosensor"
         if not sensors:
             messages.append("Chưa đọc được cảm biến nhiệt độ nào trên máy này.")
-        return Reading(sensors=sensors, source=" + ".join(sources) or "—", mode=mode, messages=messages)
+        return Reading(sensors=sensors, source=" + ".join(sources) or "—", mode=mode, messages=messages,
+                       metrics=metrics)
 
 
 class DemoAuto:
@@ -475,7 +609,7 @@ class DemoAuto:
         self.p = DemoProvider()
 
     def read(self) -> Reading:
-        return Reading(sensors=self.p.read(), source=self.p.name, mode="demo",
+        return Reading(sensors=self.p.read(), source=self.p.name, mode="demo", metrics=self.p.metrics(),
                        messages=["Đang chạy chế độ DEMO – số liệu mô phỏng, không phải nhiệt độ thật."])
 
 
@@ -504,5 +638,6 @@ def snapshot(reading: Reading) -> dict:
         "mode": reading.mode,
         "messages": reading.messages,
         "sensors": [asdict(s) for s in reading.sensors],
+        "metrics": reading.metrics,
         "primary": pick_primary(reading.sensors),
     }
