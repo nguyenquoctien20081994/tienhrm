@@ -50,6 +50,51 @@ def rate_per_min(history: list[tuple[float, float]] | None) -> float | None:
     return (v1 - v0) * 60 / (t1 - t0)
 
 
+def throttle_state(metrics: dict, cpu: dict | None, peak_clock: float | None) -> dict | None:
+    """Suy luận CPU hạ xung (LHM không báo trực tiếp): chỉ xét khi CPU đang tải nặng (≥ 50%).
+
+    - "thermal": xung < 80% mức cao nhất từng đạt khi tải nặng VÀ CPU đang rất nóng (gần TjMax/ngưỡng nguy hiểm)
+    - "power":   tải ≥ 80%, xung thấp nhưng CPU không nóng -> giới hạn điện năng/tiết kiệm pin, không do nhiệt
+    """
+    # Dùng xung của nhân nhanh nhất: xung trung bình tự thấp khi nhiều nhân rảnh, dễ báo nhầm
+    clock, load = metrics.get("cpu_clock_max") or metrics.get("cpu_clock"), metrics.get("cpu_load")
+    if clock is None or load is None or not peak_clock or peak_clock < 800:
+        return None
+    ratio = clock / peak_clock
+    info = {"clock": clock, "peak": round(peak_clock), "ratio": round(ratio * 100)}
+    if load < 50 or ratio >= 0.8:
+        return {**info, "state": "none"}
+    tjmax = metrics.get("tjmax")
+    hot = cpu is not None and ((tjmax and cpu["value"] >= tjmax - 5) or cpu["value"] >= cpu["crit"])
+    if hot:
+        return {**info, "state": "thermal"}
+    # Không nóng mà xung thấp: chỉ kết luận "giới hạn công suất" khi CPU thực sự chạy hết sức (≥ 80%)
+    return {**info, "state": "power" if load >= 80 else "none"}
+
+
+def drive_notes(metrics: dict) -> tuple[list[str], list[str], str | None]:
+    """Sức khoẻ ổ SSD: (ghi chú, lời khuyên, mức xấu nhất)."""
+    notes, tips, worst = [], [], None
+    for d in metrics.get("drives") or []:
+        life = d.get("life")
+        if life is None and d.get("used_pct") is not None:
+            life = max(0.0, 100 - d["used_pct"])
+        name = d["hardware"]
+        if life is not None and life <= 10:
+            notes.append(f"Ổ {name} chỉ còn khoảng {life:.0f}% tuổi thọ.")
+            tips.append(f"Sao lưu dữ liệu và chuẩn bị thay ổ {name}.")
+            worst = "hot"
+        elif life is not None and life <= 30:
+            notes.append(f"Ổ {name} còn {life:.0f}% tuổi thọ – nên theo dõi.")
+            worst = worst or "warm"
+        spare, spare_min = d.get("spare"), d.get("spare_min")
+        if spare is not None and spare_min is not None and spare <= spare_min:
+            notes.append(f"Ổ {name} đã dùng hết vùng dự phòng (spare {spare:.0f}%).")
+            tips.append(f"Ổ {name} có dấu hiệu sắp hỏng – sao lưu dữ liệu ngay.")
+            worst = "hot"
+    return notes, tips, worst
+
+
 def _component(key: str, snap: dict, settings: dict) -> dict | None:
     by_id = {s["id"]: s for s in snap.get("sensors", [])}
     pick = settings.get("picks", {}).get(key, "auto")
@@ -71,7 +116,17 @@ def _component(key: str, snap: dict, settings: dict) -> dict | None:
             "level": level_of(t, warn, crit), "score": score_of(t, warn, crit)}
 
 
-def evaluate(snap: dict, settings: dict, history: dict[str, list] | None = None) -> dict:
+def chosen_values(snap: dict, settings: dict) -> dict:
+    """Giá trị đang hiển thị trên 3 đồng hồ (theo lựa chọn cảm biến) – dùng để ghi nhật ký."""
+    out = {}
+    for key in ("cpu", "gpu", "board"):
+        c = _component(key, snap, settings)
+        out[key] = c["value"] if c else None
+    return out
+
+
+def evaluate(snap: dict, settings: dict, history: dict[str, list] | None = None,
+             peak_clock: float | None = None) -> dict:
     history = history or {}
     if snap.get("mode") not in ("live", "demo"):
         return {"level": "unknown", "short": SHORT["unknown"], "icon": ICON["unknown"], "score": None,
@@ -123,11 +178,25 @@ def evaluate(snap: dict, settings: dict, history: dict[str, list] | None = None)
         notes.append(f"Nhiệt CPU đang tăng nhanh (+{cpu_rate:.0f}°C/phút).")
     elif cpu_rate is not None and cpu_rate <= -4:
         notes.append(f"CPU đang hạ nhiệt ({cpu_rate:.0f}°C/phút).")
-    if cpu and tjmax:
-        gap = tjmax - cpu["value"]
-        if gap <= 3:
-            notes.append(f"CPU đã chạm ngưỡng TjMax {tjmax:.0f}°C: máy tự giảm xung (chạy chậm lại) để bảo vệ.")
-            tips.append("Giảm tải ngay; nếu thường xuyên chạm TjMax khi làm việc nhẹ, nên mang máy đi vệ sinh.")
+    temp_level = level
+    throttle = throttle_state(m, cpu, peak_clock)
+    if throttle and throttle["state"] == "thermal":
+        notes.append(f"CPU đang tự hạ xung vì nóng: chỉ chạy {throttle['clock'] / 1000:.2f} GHz, "
+                     f"bằng {throttle['ratio']}% mức cao nhất ({throttle['peak'] / 1000:.2f} GHz) – máy sẽ chậm đi.")
+        tips.append("Giảm tải, kê cao máy cho thoáng; nếu hạ xung thường xuyên, nên vệ sinh quạt và thay keo tản nhiệt.")
+        if LEVELS.index(level) < LEVELS.index("hot"):
+            level = "hot"
+    elif throttle and throttle["state"] == "power":
+        notes.append(f"CPU đang bị giới hạn xung ({throttle['ratio']}% mức cao nhất) nhưng không phải do nhiệt – "
+                     "thường do chế độ tiết kiệm pin/điện năng hoặc giới hạn công suất của máy.")
+    elif cpu and tjmax and tjmax - cpu["value"] <= 3:
+        notes.append(f"CPU đã chạm ngưỡng TjMax {tjmax:.0f}°C: máy tự giảm xung (chạy chậm lại) để bảo vệ.")
+        tips.append("Giảm tải ngay; nếu thường xuyên chạm TjMax khi làm việc nhẹ, nên mang máy đi vệ sinh.")
+    d_notes, d_tips, d_level = drive_notes(m)
+    notes += d_notes
+    tips += d_tips
+    if d_level and LEVELS.index(level) < LEVELS.index(d_level):
+        level = d_level
 
     headline = {
         "cool": "Máy đang rất mát mẻ – tản nhiệt hoạt động xuất sắc" if excellent
@@ -138,6 +207,10 @@ def evaluate(snap: dict, settings: dict, history: dict[str, list] | None = None)
         "hot": "Máy đang nóng – nên giảm tải hoặc cải thiện thông gió",
         "critical": "Quá nhiệt! – hãy đóng bớt ứng dụng nặng ngay",
     }[level]
+    if level != temp_level and d_level == level and not (throttle and throttle["state"] == "thermal"):
+        # Mức xấu đến từ sức khoẻ ổ đĩa, không phải nhiệt độ
+        headline = "Nhiệt độ ổn – nhưng ổ cứng cần chú ý" if temp_level in ("cool", "normal") \
+            else "Máy hơi ấm và ổ cứng cần chú ý"
     gap_warn = worst["warn"] - worst["value"]
     where = (f"{worst['label']} {worst['value']:.0f}°C, còn {gap_warn:.0f}°C tới ngưỡng cảnh báo" if gap_warn > 0
              else f"{worst['label']} {worst['value']:.0f}°C, vượt ngưỡng cảnh báo {abs(gap_warn):.0f}°C")
@@ -146,4 +219,4 @@ def evaluate(snap: dict, settings: dict, history: dict[str, list] | None = None)
         tips.append("Lưu công việc, đóng ứng dụng nặng và để máy nghỉ vài phút.")
     return {"level": level, "short": SHORT[level], "icon": ICON[level], "score": score,
             "headline": headline, "detail": detail.strip(), "tips": tips,
-            "hottest": {"label": worst["label"], "value": worst["value"]}}
+            "hottest": {"label": worst["label"], "value": worst["value"]}, "throttle": throttle}

@@ -22,13 +22,14 @@ import time
 import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import assess
+import history
 import sensors
 
 APP_NAME = "ThermalCoreHUD"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 DEFAULT_LHM_URL = "http://127.0.0.1:8085/data.json"
 IS_WINDOWS = sys.platform.startswith("win")
 FROZEN = getattr(sys, "frozen", False)
@@ -48,9 +49,14 @@ for _stream in (sys.stdout, sys.stderr):
 
 
 INTERVAL_CHOICES = (5, 10, 15, 30, 60)
+HISTORY_DAY_CHOICES = (7, 14, 30)
+UI_STYLES = ("hud", "cockpit")
+UI_THEMES = ("auto", "night", "day")
 DEFAULT_SETTINGS = {
     "unit": "C",
     "interval": 15,  # giây giữa 2 lần đọc cảm biến
+    "history_days": 30,  # số ngày giữ nhật ký nhiệt độ
+    "ui": {"style": "hud", "theme": "auto"},  # đồng hồ cơ / buồng lái; ngày / đêm / tự động theo giờ
     # Ngưỡng cho ThinkPad X1 Yoga Gen 5 (i7-10610U, TjMax 100 °C; iGPU chung đế với CPU)
     "thresholds": {"cpu": {"warn": 85, "crit": 95}, "gpu": {"warn": 85, "crit": 95},
                    "board": {"warn": 65, "crit": 80}},
@@ -91,6 +97,15 @@ def validate_settings_patch(patch) -> dict:
         if patch["interval"] not in INTERVAL_CHOICES:
             raise ValueError(f"interval phải là một trong {INTERVAL_CHOICES}")
         out["interval"] = patch["interval"]
+    if "history_days" in patch:
+        if patch["history_days"] not in HISTORY_DAY_CHOICES:
+            raise ValueError(f"history_days phải là một trong {HISTORY_DAY_CHOICES}")
+        out["history_days"] = patch["history_days"]
+    if "ui" in patch:
+        ui = patch["ui"]
+        if not isinstance(ui, dict) or ui.get("style", "hud") not in UI_STYLES or ui.get("theme", "auto") not in UI_THEMES:
+            raise ValueError(f"ui.style phải thuộc {UI_STYLES}, ui.theme thuộc {UI_THEMES}")
+        out["ui"] = {k: ui[k] for k in ("style", "theme") if k in ui}
     if "thresholds" in patch:
         th = patch["thresholds"]
         if not isinstance(th, dict):
@@ -173,8 +188,10 @@ class Sampler:
 
     HISTORY_SEC = 600  # lịch sử ngắn để tính tốc độ tăng nhiệt cho phần nhận định
 
-    def __init__(self, provider, interval_fn, settings_fn, status_fn=None, extra_fn=None):
+    def __init__(self, provider, interval_fn, settings_fn, status_fn=None, extra_fn=None, db=None):
         self.provider = provider
+        self.db = db  # history.HistoryDB hoặc None
+        self.peak_clock = db.peak_clock() if db else None
         self.interval_fn = interval_fn  # đọc lại mỗi vòng -> đổi chu kỳ trong CALIBRATE có hiệu lực ngay
         self.settings_fn = settings_fn
         self.status_fn = status_fn  # trả về thông báo trạng thái (vd. đang tải LHM) hoặc None
@@ -215,11 +232,25 @@ class Sampler:
                 # Trong lúc đang chuẩn bị LHM, lỗi "không kết nối được LHM" là điều đương nhiên -> ẩn đi
                 snap["messages"] = [status] + [m for m in snap["messages"] if "LibreHardwareMonitor" not in m]
             self._remember(snap)
+            settings = self.settings_fn()
+            m = snap.get("metrics") or {}
+            clock = m.get("cpu_clock_max") or m.get("cpu_clock")
+            if (m.get("cpu_load") or 0) >= 50 and clock:
+                self.peak_clock = max(self.peak_clock or 0, clock)
             try:
-                snap["assessment"] = assess.evaluate(snap, self.settings_fn(), self.history)
+                snap["assessment"] = assess.evaluate(snap, settings, self.history, self.peak_clock)
             except Exception as exc:  # noqa: BLE001 - nhận định lỗi không được làm mất số liệu
                 snap["assessment"] = None
                 print("Lỗi nhận định:", exc)
+            if self.db and snap.get("mode") in ("live", "demo"):
+                try:
+                    a = snap["assessment"] or {}
+                    self.db.record(snap["ts"], {**assess.chosen_values(snap, settings),
+                                                "cpu_load": m.get("cpu_load"), "cpu_clock": clock,
+                                                "throttle": (a.get("throttle") or {}).get("state"),
+                                                "level": a.get("level")}, settings["history_days"])
+                except Exception as exc:  # noqa: BLE001 - lỗi ghi nhật ký không được làm dừng việc đo
+                    print("Lỗi ghi nhật ký:", exc)
             snap["interval"] = interval
             snap["readMs"] = round((time.monotonic() - started) * 1000)
             snap["version"] = APP_VERSION
@@ -257,7 +288,7 @@ class Sampler:
                 self.idle_since = time.monotonic()
 
 
-def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_ctl=None):
+def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_ctl=None, db=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = f"{APP_NAME}/{APP_VERSION}"
 
@@ -284,6 +315,15 @@ def make_handler(sampler: Sampler, web_dir: str, store: SettingsStore, overlay_c
                 return self._stream()
             if path == "/api/settings":
                 return self._json(200, store.get())
+            if path in ("/api/history", "/api/report"):
+                if db is None:
+                    return self._json(409, {"error": "nhật ký không khả dụng"})
+                q = parse_qs(urlparse(self.path).query)
+                if path == "/api/history":
+                    rng = q.get("range", ["24h"])[0]
+                    return self._json(200, db.series(rng if rng in history.RANGES else "24h"))
+                days = int(q.get("days", ["7"])[0]) if q.get("days", ["7"])[0].isdigit() else 7
+                return self._json(200, db.report(min(max(days, 1), 30), store.get()["thresholds"]))
             return self._static(path)
 
         def _json(self, code: int, obj) -> None:
@@ -468,6 +508,16 @@ def main() -> None:
                 print("Cảnh báo: app không chạy quyền Administrator – có thể thiếu nhiệt độ CPU/mainboard.")
 
     store = SettingsStore(settings_path())
+    # Nhật ký nhiệt độ (DEMO dùng file riêng để không lẫn với số liệu thật)
+    db = None
+    try:
+        db = history.HistoryDB(os.path.join(os.path.dirname(settings_path()),
+                                            "history-demo.db" if args.demo else "history.db"))
+        if args.demo:
+            history.seed_demo(db)
+    except Exception as exc:  # noqa: BLE001 - không ghi được nhật ký vẫn phải đo được nhiệt độ
+        print("Không mở được nhật ký nhiệt độ:", exc)
+        db = None
     stop = threading.Event()
 
     # Overlay cần cửa sổ đồ hoạ (Tk) chạy trên luồng chính; máy không có màn hình thì bỏ qua.
@@ -498,7 +548,7 @@ def main() -> None:
         return float(store.get()["interval"])
 
     sampler = Sampler(provider, interval, store.get, status_fn=(lambda: manager.status) if manager else None,
-                      extra_fn=lambda: {"overlay": None if ctl is None else ctl.visible})
+                      extra_fn=lambda: {"overlay": None if ctl is None else ctl.visible}, db=db)
     store.listeners.append(lambda patch: "interval" in patch and sampler.wake.set())  # đo lại ngay theo chu kỳ mới
     if ctl is not None:
         ctl.on_change = sampler.republish  # nút OVERLAY trên giao diện cập nhật ngay
@@ -506,7 +556,7 @@ def main() -> None:
 
     # Chỉ lắng nghe 127.0.0.1: máy khác trong mạng không truy cập được.
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(sampler, resource_dir(), store, ctl))
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(sampler, resource_dir(), store, ctl, db))
     except OSError as exc:
         fatal(f"Không mở được cổng {args.port} ({exc}). Hãy đóng ứng dụng đang dùng cổng này "
               f"hoặc chạy với tham số --port khác.")
@@ -552,6 +602,8 @@ def main() -> None:
         server.server_close()
         if manager:
             manager.shutdown()
+        if db:
+            db.close()
 
 
 if __name__ == "__main__":

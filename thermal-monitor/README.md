@@ -57,6 +57,29 @@ App không chỉ so nhiệt độ với ngưỡng mà còn **xét mức tải CP
 
 Kết luận "tản nhiệt tốt/kém" chỉ đưa ra khi có số liệu tải làm căn cứ.
 
+### Hai kiểu đồng hồ, hai chế độ màu
+- Nút **HUD / COCKPIT**: HUD là đồng hồ cơ tròn; COCKPIT là thanh đo dọc kiểu buồng lái máy bay, có con trỏ, dải vùng nhiệt và số đọc lớn.
+- Nút **◐ AUTO / ☾ ĐÊM / ☀ NGÀY**: AUTO tự đổi theo giờ (6:00–18:00 là ngày). Mặt đồng hồ luôn giữ nền tối như đồng hồ thật.
+
+### CORE MAP – bản đồ nhiệt từng nhân CPU
+Mỗi hàng là một nhân, mỗi cột là một lần đo trong 60 phút gần nhất; màu càng đậm/càng cam là càng nóng (thang cố định 30–100°C). Cột bên phải ghi nhiệt độ và tải hiện tại của từng nhân. Rê chuột để xem chi tiết. Nhân nào nóng hơn hẳn các nhân khác có thể do lỗi keo tản nhiệt.
+
+### Sức khoẻ ổ cứng (S.M.A.R.T)
+Mỗi ổ có: % tuổi thọ còn lại (✓ TỐT / ▲ THEO DÕI dưới 30% / ⛔ NÊN THAY dưới 10%), nhiệt độ so với ngưỡng của nhà sản xuất, tổng dữ liệu đã ghi/đọc, giờ hoạt động, số lần bật, dung lượng đã dùng, vùng dự phòng (NVMe). Ổ gần hết tuổi thọ hoặc hết vùng dự phòng → thanh nhận định nhắc sao lưu. Ổ SATA đời cũ có thể chỉ báo nhiệt độ.
+
+### Nhật ký nhiệt độ (lưu 7/14/30 ngày)
+- Mỗi lần đo được ghi vào `%LOCALAPPDATA%\ThermalCoreHUD\history.db` (SQLite, khoảng 0,3 MB/ngày). Đổi số ngày lưu trong **CALIBRATE**.
+- Tab **1 GIỜ / 24 GIỜ / 7 NGÀY / 30 NGÀY**: biểu đồ đường CPU/GPU/BOARD (khoảng dài có thêm vùng nhạt = mức cao nhất của CPU), đường đứt nét = ngưỡng cảnh báo.
+- Tóm tắt bằng lời, ví dụ *"Máy thường nóng nhất khoảng 13:00–14:00 (CPU trung bình 71°C, tải 61%)"*.
+- Các ô số: CPU trung bình, cao nhất (kèm thời điểm), số phút vượt ngưỡng, số phút hạ xung do nhiệt.
+- Biểu đồ **CPU trung bình theo giờ trong ngày** và **bản đồ nhiệt ngày × giờ**.
+
+### Phát hiện CPU tự hạ xung (throttling)
+LibreHardwareMonitor không báo trực tiếp trạng thái hạ xung, nên app **suy luận** bằng cách so xung của nhân nhanh nhất với mức cao nhất CPU từng đạt khi tải nặng (lưu trong nhật ký):
+- Tải ≥ 50%, xung < 80% mức cao nhất và CPU đang rất nóng (gần TjMax) → **⚠ HẠ XUNG DO NHIỆT**: máy chậm đi vì nóng.
+- Tải ≥ 80%, xung thấp nhưng CPU không nóng → **GIỚI HẠN XUNG**: do chế độ tiết kiệm pin/điện năng hoặc giới hạn công suất, không phải do nhiệt.
+- Cần vài phút chạy nặng đầu tiên để app biết "mức xung cao nhất" của máy.
+
 ### Thông số phụ dưới mỗi đồng hồ
 - **CPU:** tải (%), công suất (W), xung nhịp (GHz), khoảng cách tới **TjMax** (nhiệt độ CPU tự giảm xung để bảo vệ).
 - **GPU:** tải (%); Intel iGPU ghi rõ "chung đế CPU".

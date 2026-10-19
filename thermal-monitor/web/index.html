@@ -35,6 +35,8 @@
     <div class="right">
       <div class="clock"><b id="clock">--:--:--</b><small id="date">----</small></div>
       <div class="controls">
+        <button id="btnStyle" title="Đổi kiểu đồng hồ: đồng hồ cơ (HUD) / buồng lái (thanh dọc)">HUD</button>
+        <button id="btnTheme" title="Chế độ ngày / đêm / tự động theo giờ">◐ AUTO</button>
         <button id="btnUnit" title="Đổi đơn vị °C / °F">°C</button>
         <button id="btnSound" title="Bật/tắt còi cảnh báo khi quá nhiệt">ALARM OFF</button>
         <button id="btnOverlay" disabled>OVERLAY</button>
@@ -62,6 +64,49 @@
 
   <main class="gauges" id="gauges"></main>
 
+  <div class="row-2">
+    <section class="panel" id="corePanel">
+      <div class="panel-head">
+        <h2><span>//</span> CORE MAP</h2>
+        <small>Nhiệt độ từng nhân CPU – 60 phút gần nhất (mỗi cột = 1 lần đo)</small>
+      </div>
+      <div class="chart-box"><canvas id="coreMap" height="200"></canvas><div class="tooltip" hidden></div></div>
+      <div class="scale-legend"><span>30°</span><b></b><span>100°C</span></div>
+    </section>
+    <section class="panel" id="drivePanel">
+      <div class="panel-head">
+        <h2><span>//</span> SỨC KHOẺ Ổ CỨNG</h2>
+        <small>Theo dữ liệu S.M.A.R.T của ổ</small>
+      </div>
+      <div id="drives"><p class="empty-note">Đang chờ dữ liệu…</p></div>
+    </section>
+  </div>
+
+  <section class="panel log" id="logPanel">
+    <div class="panel-head">
+      <h2><span>//</span> NHẬT KÝ NHIỆT ĐỘ</h2>
+      <div class="tabs" id="logTabs">
+        <button data-range="1h">1 GIỜ</button><button data-range="24h" class="on">24 GIỜ</button>
+        <button data-range="7d">7 NGÀY</button><button data-range="30d">30 NGÀY</button>
+      </div>
+    </div>
+    <ul class="log-summary" id="logSummary"></ul>
+    <div class="tiles" id="logTiles"></div>
+    <div class="legend" id="histLegend"></div>
+    <div class="chart-box"><canvas id="histChart" height="240"></canvas><div class="tooltip" hidden></div></div>
+    <div class="log-grid">
+      <div>
+        <h3 class="chart-title" id="hourTitle">CPU TRUNG BÌNH THEO GIỜ TRONG NGÀY</h3>
+        <div class="chart-box"><canvas id="hourChart" height="200"></canvas><div class="tooltip" hidden></div></div>
+      </div>
+      <div>
+        <h3 class="chart-title">BẢN ĐỒ NHIỆT: NGÀY × GIỜ (CPU TRUNG BÌNH)</h3>
+        <div class="chart-box"><canvas id="dayHeat" height="200"></canvas><div class="tooltip" hidden></div></div>
+        <div class="scale-legend"><span>30°</span><b></b><span>100°C</span></div>
+      </div>
+    </div>
+  </section>
+
   <section class="bank">
     <div class="bank-head">
       <h2><span>//</span> SENSOR ARRAY</h2>
@@ -83,6 +128,11 @@
         <select id="selInterval">
           <option value="5">5 giây</option><option value="10">10 giây</option><option value="15">15 giây (khuyên dùng)</option>
           <option value="30">30 giây</option><option value="60">60 giây</option>
+        </select>
+      </label>
+      <label class="settings-interval">Lưu nhật ký nhiệt độ
+        <select id="selHistory">
+          <option value="7">7 ngày</option><option value="14">14 ngày</option><option value="30">30 ngày</option>
         </select>
       </label>
       <div id="settingsRows" class="settings-rows"></div>
@@ -114,5 +164,6 @@
   </template>
 
   <script src="app.js"></script>
+  <script src="charts.js"></script>
 </body>
 </html>

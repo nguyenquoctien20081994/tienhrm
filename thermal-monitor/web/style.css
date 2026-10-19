@@ -11,16 +11,74 @@
   --green: #3dffa2;
   --amber: #ffb020;
   --red: #ff3b4e;
+  --bg-glow: #0c1d36;
+  --card-end: rgba(5, 11, 20, 0.85);
+  --inset: rgba(0, 0, 0, 0.25);
+  --text-strong: #ffffff;
+  --text-soft: #bcd0e6;
+  --warn-text: #ffd58a;
+  --vignette: rgba(0, 0, 0, 0.65);
+  --dialog: #07101d;
+  /* Màu nhận diện từng đồng hồ (mặt đồng hồ luôn tối nên canvas dùng bản neon) */
+  --acc-cpu: #22e5ff;
+  --acc-gpu: #ff3db8;
+  --acc-board: #3dffa2;
+  /* Biểu đồ – đã kiểm tra phân biệt màu (người mù màu) trên nền tối */
+  --series-cpu: #1ca4c4;
+  --series-gpu: #c0308a;
+  --series-board: #2a9a4e;
+  --chart-text: #c9d9ea;
+  --chart-muted: #7d93ad;
+  --chart-grid: rgba(125, 147, 173, 0.16);
+  --seq-lo: #17212e;   /* thang màu nhiệt (1 sắc cam): thấp -> cao */
+  --seq-hi: #ff8a3d;
   --font-ui: "Bahnschrift", "Rajdhani", "Segoe UI", "Roboto Condensed", system-ui, sans-serif;
   --font-mono: "Cascadia Mono", "Consolas", "JetBrains Mono", "SFMono-Regular", monospace;
 }
+
+/* Chế độ NGÀY: nền sáng; mặt đồng hồ giữ màu tối như đồng hồ thật */
+:root[data-theme="day"] {
+  --bg: #e8edf4;
+  --bg-glow: #ffffff;
+  --panel: rgba(255, 255, 255, 0.9);
+  --panel-2: #ffffff;
+  --card-end: #f1f5fa;
+  --inset: #eef2f7;
+  --line: #cdd7e4;
+  --line-2: #a7b6ca;
+  --text: #1a2a3d;
+  --text-strong: #0b1726;
+  --text-soft: #34475e;
+  --muted: #5d6f86;
+  --warn-text: #8a5300;
+  --vignette: rgba(30, 50, 80, 0.12);
+  --dialog: #ffffff;
+  --cyan: #0085aa;
+  --magenta: #b51f80;
+  --green: #2e8a32;
+  --amber: #b36b00;
+  --red: #c8102e;
+  --acc-cpu: #0085aa;
+  --acc-gpu: #b51f80;
+  --acc-board: #2e8a32;
+  --series-cpu: #0085aa;
+  --series-gpu: #b51f80;
+  --series-board: #2e8a32;
+  --chart-text: #1f3147;
+  --chart-muted: #5d6f86;
+  --chart-grid: rgba(60, 80, 110, 0.14);
+  --seq-lo: #fdeee0;
+  --seq-hi: #c2410c;
+}
+:root[data-theme="day"] .fx-scan { display: none; }
 
 * { box-sizing: border-box; }
 
 html, body { margin: 0; min-height: 100%; }
 
 body {
-  background: radial-gradient(ellipse at 50% -10%, #0c1d36 0%, var(--bg) 60%) fixed, var(--bg);
+  background: radial-gradient(ellipse at 50% -10%, var(--bg-glow) 0%, var(--bg) 60%) fixed, var(--bg);
+  transition: background-color 0.4s, color 0.4s;
   color: var(--text);
   font-family: var(--font-ui);
   letter-spacing: 0.04em;
@@ -43,7 +101,7 @@ body {
   background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px);
   z-index: 50;
 }
-.fx-vignette { background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.65) 100%); z-index: 49; }
+.fx-vignette { background: radial-gradient(ellipse at center, transparent 55%, var(--vignette) 100%); z-index: 49; }
 
 body > *:not(.fx-grid):not(.fx-scan):not(.fx-vignette):not(dialog) { position: relative; z-index: 1; }
 
@@ -109,7 +167,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
   margin: 0 0 14px; padding: 12px 18px;
   border: 1px solid color-mix(in srgb, var(--lv) 55%, transparent);
   border-left: 4px solid var(--lv);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--lv) 16%, transparent), rgba(6, 12, 22, 0.75) 60%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--lv) 16%, transparent), var(--panel) 60%);
   box-shadow: 0 0 22px color-mix(in srgb, var(--lv) 18%, transparent);
 }
 .verdict[data-level="critical"] { animation: alarm 0.9s ease-in-out infinite; }
@@ -120,9 +178,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
 }
 .v-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .v-tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.25em; color: var(--lv); }
-.v-head b { font-size: 19px; letter-spacing: 0.04em; color: #fff; }
-.verdict p { margin: 4px 0 0; color: #bcd0e6; font-size: 14px; letter-spacing: 0.02em; line-height: 1.45; }
-.verdict ul { margin: 4px 0 0; padding-left: 18px; color: #ffd58a; font-size: 13px; }
+.v-head b { font-size: 19px; letter-spacing: 0.04em; color: var(--text-strong); }
+.verdict p { margin: 4px 0 0; color: var(--text-soft); font-size: 14px; letter-spacing: 0.02em; line-height: 1.45; }
+.verdict ul { margin: 4px 0 0; padding-left: 18px; color: var(--warn-text); font-size: 13px; }
 .verdict ul:empty { display: none; }
 .v-score { position: relative; width: 74px; text-align: center; }
 .v-score svg { width: 74px; height: 74px; transform: rotate(-90deg); display: block; }
@@ -151,7 +209,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
   animation: alarm 0.9s ease-in-out infinite; text-align: center;
 }
 @keyframes alarm { 50% { box-shadow: 0 0 28px rgba(255, 59, 78, 0.7); } }
-.msg-bar { border-left: 3px solid var(--amber); background: rgba(255, 176, 32, 0.08); color: #ffd58a; }
+.msg-bar { border-left: 3px solid var(--amber); background: rgba(255, 176, 32, 0.08); color: var(--warn-text); }
 .msg-bar p { margin: 2px 0; }
 
 /* ---------- Thẻ đồng hồ ---------- */
@@ -161,7 +219,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
 .card {
   --accent: var(--cyan);
   position: relative; padding: 14px 16px 24px;
-  background: linear-gradient(180deg, var(--panel) 0%, rgba(5, 11, 20, 0.85) 100%);
+  background: linear-gradient(180deg, var(--panel) 0%, var(--card-end) 100%);
   border: 1px solid var(--line);
   clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px));
   transition: border-color 0.3s, box-shadow 0.3s;
@@ -198,7 +256,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
 .stats div { background: rgba(255, 255, 255, 0.025); border: 1px solid var(--line); padding: 5px 8px; }
 .stats label { display: block; font-size: 9px; color: var(--muted); letter-spacing: 0.25em; }
 .stats b { font-family: var(--font-mono); font-size: 15px; }
-.spark { width: 100%; height: 64px; display: block; margin-top: 8px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.25); }
+.spark { width: 100%; height: 64px; display: block; margin-top: 8px; border: 1px solid var(--line); background: var(--inset); }
 .tele { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .tele:empty { display: none; }
 .tele span {
@@ -256,6 +314,66 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
   .clock { display: none; }
 }
 
+.card[data-key="cpu"] { --accent: var(--acc-cpu); }
+.card[data-key="gpu"] { --accent: var(--acc-gpu); }
+.card[data-key="board"] { --accent: var(--acc-board); }
+.tele span.throttle-thermal { border-color: var(--red); color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+.tele span.throttle-power { border-color: var(--amber); color: var(--amber); }
+
+/* ---------- Bảng phụ: bản đồ nhiệt từng nhân, sức khoẻ ổ, nhật ký ---------- */
+.panel { border: 1px solid var(--line); background: var(--panel); padding: 14px 16px; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.panel h2 { margin: 0; font-size: 14px; letter-spacing: 0.35em; }
+.panel h2 span { color: var(--cyan); }
+.panel-head small { color: var(--muted); font-size: 12px; letter-spacing: 0.04em; }
+.row-2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; margin-top: 22px; }
+@media (max-width: 980px) { .row-2 { grid-template-columns: minmax(0, 1fr); } }
+.chart-box { position: relative; }
+.chart-box canvas { display: block; width: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--chart-text); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.legend .ref i { height: 0; border-top: 2px dashed var(--chart-muted); }
+.scale-legend { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--chart-muted); margin-top: 6px; font-family: var(--font-mono); }
+.scale-legend b { display: block; width: 140px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--seq-lo), var(--seq-hi)); }
+.tooltip {
+  position: absolute; pointer-events: none; z-index: 5; min-width: 120px; padding: 7px 9px;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); font-size: 12px; line-height: 1.45;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35); font-family: var(--font-mono); white-space: nowrap;
+}
+.tooltip[hidden] { display: none; }
+.tooltip .sw { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.empty-note { color: var(--muted); font-size: 13px; padding: 16px 0; }
+
+/* Ổ cứng */
+.drive { border: 1px solid var(--line); padding: 10px 12px; margin-bottom: 10px; background: color-mix(in srgb, var(--panel-2) 40%, transparent); }
+.drive:last-child { margin-bottom: 0; }
+.drive-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.drive-top b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drive-status { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+.drive-status.good { color: var(--green); } .drive-status.watch { color: var(--amber); } .drive-status.bad { color: var(--red); }
+.life { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.life-bar { flex: 1; height: 8px; background: var(--inset); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.life-bar i { display: block; height: 100%; border-radius: 4px; background: var(--green); }
+.life strong { font-family: var(--font-mono); font-size: 20px; min-width: 64px; text-align: right; }
+.drive dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; margin: 0; }
+.drive dt { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); }
+.drive dd { margin: 0; font-family: var(--font-mono); font-size: 13px; }
+
+/* Nhật ký */
+.log { margin-top: 22px; }
+.tabs { display: flex; gap: 4px; }
+.tabs button.on { border-color: var(--cyan); color: var(--cyan); }
+.log-summary { margin: 4px 0 14px; padding-left: 18px; color: var(--text-soft); font-size: 14px; line-height: 1.6; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.tile { border: 1px solid var(--line); padding: 8px 10px; }
+.tile label { display: block; font-size: 10px; letter-spacing: 0.15em; color: var(--muted); }
+.tile b { font-family: var(--font-mono); font-size: 22px; color: var(--text-strong); }
+.tile small { display: block; color: var(--muted); font-size: 11px; }
+@media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.log-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 14px; }
+@media (max-width: 980px) { .log-grid { grid-template-columns: minmax(0, 1fr); } }
+.log-grid h3, .chart-title { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.2em; color: var(--muted); font-weight: 600; }
+
 /* ---------- Danh sách cảm biến ---------- */
 .bank { margin-top: 22px; border: 1px solid var(--line); background: var(--panel); padding: 14px 16px; }
 .bank-head { display: flex; justify-content: space-between; align-items: baseline; }
@@ -275,7 +393,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; color: va
 .hud-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 18px; color: var(--muted); font-size: 11px; letter-spacing: 0.15em; }
 
 /* ---------- Hộp thoại cài đặt ---------- */
-.settings { background: #07101d; color: var(--text); border: 1px solid var(--cyan); padding: 18px 20px; width: min(520px, 92vw); font-family: var(--font-ui); }
+.settings { background: var(--dialog); color: var(--text); border: 1px solid var(--cyan); padding: 18px 20px; width: min(520px, 92vw); font-family: var(--font-ui); }
 .settings::backdrop { background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(3px); }
 .settings h3 { margin: 0 0 8px; letter-spacing: 0.3em; }
 .settings p { color: var(--muted); font-size: 13px; }

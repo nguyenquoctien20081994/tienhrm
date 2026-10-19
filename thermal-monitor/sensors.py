@@ -110,9 +110,11 @@ def pick_primary(sensors: list[Sensor]) -> dict[str, str | None]:
 # LibreHardwareMonitor (Windows) – đọc từ Remote Web Server: http://localhost:8085/data.json
 # ---------------------------------------------------------------------------
 
-_GROUP_NAMES = {"temperatures", "voltages", "clocks", "loads", "fans", "controls", "powers",
-                "data", "smalldata", "throughput", "levels", "factors", "currents",
-                "frequencies", "energy", "noise", "timings", "conductances", "humidity"}
+# Tên nút nhóm theo loại cảm biến của LHM (UI/TypeNode.cs), kèm vài tên cũ
+_GROUP_NAMES = {"voltages", "currents", "capacities", "clocks", "load", "loads", "temperatures", "fans", "flows",
+                "controls", "levels", "powers", "data", "smalldata", "factors", "frequencies", "throughput",
+                "times", "timings", "noise levels", "noise", "conductivities", "conductances",
+                "humidity levels", "humidity", "energy"}
 
 _VALUE_RE = re.compile(r"(-?\d+(?:[.,]\d+)?)\s*°?\s*([CF])\b")
 
@@ -171,6 +173,20 @@ _UNIT_TYPES = [("°C", "temperature"), ("°F", "temperature"), ("%", "load"), ("
 # Ổ cứng công bố ngưỡng cố định dưới dạng "cảm biến" nhiệt độ -> không phải nhiệt độ đo được
 _LIMIT_RE = re.compile(r"warning temperature|critical temperature|threshold|temperature limit", re.I)
 TEMP_VALID = (-30.0, 150.0)  # ngoài khoảng này coi như cảm biến lỗi
+_CORE_RE = re.compile(r"^((cpu |p-|e-)?core)( #?\d+)?$")  # "CPU Core #1", "P-Core #2", "Core 0" (Linux)
+# (loại, tên cảm biến LHM) -> trường sức khoẻ ổ đĩa
+_DRIVE_FIELDS = {
+    ("level", "life"): "life",                      # % tuổi thọ còn lại
+    ("level", "percentage used"): "used_pct",       # % tuổi thọ đã dùng (NVMe)
+    ("level", "available spare"): "spare",
+    ("level", "available spare threshold"): "spare_min",
+    ("data", "data written"): "written_gb",
+    ("data", "data read"): "read_gb",
+    ("factor", "power on hours"): "hours",
+    ("factor", "power on count"): "power_cycles",
+    ("load", "used space"): "space_used",
+    ("data", "total space"): "total_gb",
+}
 
 
 def _num(node: dict, key: str) -> float | None:
@@ -256,23 +272,53 @@ def parse_lhm(root: dict) -> tuple[list[Sensor], dict]:
 
     metrics: dict = {"fans": []}
     clocks = []
+    core_clock: dict[str, float] = {}
+    core_load: dict[int, list[float]] = {}
+    drives: dict[str, dict] = {}
     for stype, name, hardware, category, node in leaves:
         v = _num(node, "Value")
         lname = name.lower()
         if v is None:
             continue
+        if category == "storage":
+            key = _DRIVE_FIELDS.get((stype, lname))
+            if key:
+                drives.setdefault(hardware, {"hardware": hardware})[key] = round(v, 1)
+            continue
         if stype == "load" and category == "cpu" and lname in ("cpu total", "total"):
             metrics["cpu_load"] = round(v, 1)
+        elif stype == "load" and category == "cpu" and (m := re.match(r"cpu core #(\d+)( thread #\d+)?$", lname)):
+            core_load.setdefault(int(m.group(1)), []).append(v)
         elif stype == "power" and category == "cpu" and lname in ("cpu package", "package"):
             metrics["cpu_power"] = round(v, 1)
-        elif stype == "clock" and category == "cpu" and re.match(r"(cpu )?core #\d+$", lname):
+        elif stype == "clock" and category == "cpu" and _CORE_RE.match(lname):
             clocks.append(v)
+            core_clock[lname.removeprefix("cpu ")] = v  # "Core #1" (LHM cũ) == "CPU Core #1"
         elif stype == "load" and category == "gpu" and lname in ("gpu core", "d3d 3d"):
             metrics.setdefault("gpu_load", round(v, 1))
         elif stype == "fan" and v > 0:
             metrics["fans"].append({"name": name, "hardware": hardware, "rpm": round(v)})
     if clocks:
         metrics["cpu_clock"] = round(sum(clocks) / len(clocks))
+        metrics["cpu_clock_max"] = round(max(clocks))  # nhân nhanh nhất – dùng để nhận biết hạ xung
+    # Từng nhân: nhiệt độ + tải + xung. Tải được đặt tên theo số thứ tự nhân ("CPU Core #k Thread #m")
+    # còn nhiệt độ/xung có thể là "P-Core #1"/"E-Core #1" -> ghép theo chỉ số trong SensorId.
+    cores = []
+    for pos, s in enumerate(x for x in sensors if x.category == "cpu" and _CORE_RE.match(x.name.lower())):
+        m = re.search(r"/temperature/(\d+)$", s.id)
+        k = int(m.group(1)) + 1 if m else pos + 1
+        loads = core_load.get(k)
+        cores.append({"name": s.name, "temp": s.value,
+                      "load": round(sum(loads) / len(loads), 1) if loads else None,
+                      "clock": round(c) if (c := core_clock.get(s.name.lower().removeprefix("cpu "))) else None})
+    if cores:
+        metrics["cores"] = cores
+    # Ổ cứng: sức khoẻ, dữ liệu đã ghi, giờ hoạt động...
+    for s in sensors:
+        if s.category == "storage" and s.hardware in drives and s.name.lower() in ("temperature", "composite temperature"):
+            drives[s.hardware].update(temp=s.value, warn=s.warn, crit=s.crit)
+    if drives:
+        metrics["drives"] = list(drives.values())
     # TjMax = nhiệt độ lõi + khoảng cách tới TjMax của chính lõi đó
     by_name = {s.name: s.value for s in sensors if s.category == "cpu"}
     tj = [by_name[n] + d for n, d in distances.items() if by_name.get(n) is not None]
@@ -506,11 +552,20 @@ class DemoProvider:
         self.t0 = time.time()
         self.state = {"cpu": 48.0, "gpu": 44.0, "board": 41.0, "nvme": 38.0}
         self.load = 0.3
+        self.core_temps = [45.0] * 6
 
     def metrics(self) -> dict:
+        cores = [{"name": f"CPU Core #{i + 1}", "temp": c, "load": round(min(100, self.load * 100 + 8 * i - 15), 1),
+                  "clock": round(1800 + 2600 * self.load - 40 * i)} for i, c in enumerate(self.core_temps)]
+        throttled = self.state["cpu"] >= 92  # mô phỏng hạ xung khi quá nóng
         return {"cpu_load": round(self.load * 100, 1), "cpu_power": round(4 + 36 * self.load, 1),
-                "cpu_clock": round(1800 + 2600 * self.load), "gpu_load": round(max(0.0, self.state["gpu"] - 40) * 2, 1),
-                "tjmax": 100, "fans": [{"name": "CPU Fan", "hardware": "Demo", "rpm": round(1500 + 3200 * self.load)}]}
+                "cpu_clock": round(1800 + 2600 * self.load), "cpu_clock_max": 2700 if throttled else 4400, "gpu_load": round(max(0.0, self.state["gpu"] - 40) * 2, 1),
+                "tjmax": 100, "fans": [{"name": "CPU Fan", "hardware": "Demo", "rpm": round(1500 + 3200 * self.load)}],
+                "cores": cores,
+                "drives": [{"hardware": "Samsung SSD 980 1TB (demo)", "life": 97.0, "used_pct": 3.0, "spare": 100.0,
+                            "spare_min": 10.0, "written_gb": 18432.0, "read_gb": 25100.0, "hours": 6120.0,
+                            "power_cycles": 1450.0, "space_used": 61.5, "total_gb": 931.5,
+                            "temp": _round(self.state["nvme"]), "warn": 82.0, "crit": 85.0}]}
 
     def read(self) -> list[Sensor]:
         t = time.time() - self.t0
@@ -522,10 +577,11 @@ class DemoProvider:
         for k, target in targets.items():
             self.state[k] += (target - self.state[k]) * speed[k] + random.uniform(-0.6, 0.6)
         cpu = self.state["cpu"]
+        self.core_temps = [_round(cpu - 4 + 1.5 * i + random.uniform(-1.5, 1.5)) for i in range(6)]
         sensors = [
             Sensor("demo/cpu/package", "CPU Package", "Intel Core i7-12700H (demo)", "cpu", _round(cpu)),
-            *[Sensor(f"demo/cpu/core{i}", f"CPU Core #{i + 1}", "Intel Core i7-12700H (demo)", "cpu",
-                     _round(cpu - 3 + random.uniform(-2, 2))) for i in range(4)],
+            *[Sensor(f"demo/cpu/core{i}", f"CPU Core #{i + 1}", "Intel Core i7-12700H (demo)", "cpu", t)
+              for i, t in enumerate(self.core_temps)],
             Sensor("demo/gpu/core", "GPU Core", "NVIDIA GeForce RTX 3060 Laptop (demo)", "gpu", _round(self.state["gpu"])),
             Sensor("demo/gpu/hotspot", "GPU Hot Spot", "NVIDIA GeForce RTX 3060 Laptop (demo)", "gpu",
                    _round(self.state["gpu"] + 9)),
@@ -632,6 +688,11 @@ def add_igpu_estimate(sensors: list[Sensor]) -> list[Sensor]:
 def snapshot(reading: Reading) -> dict:
     if reading.mode == "live":
         reading.sensors = add_igpu_estimate(reading.sensors)
+    if "cores" not in reading.metrics:  # Linux: lấy nhiệt độ từng nhân từ coretemp ("Core 0"...)
+        cores = [{"name": s.name, "temp": s.value, "load": None, "clock": None} for s in reading.sensors
+                 if s.category == "cpu" and _CORE_RE.match(s.name.lower())]
+        if cores:
+            reading.metrics["cores"] = cores
     return {
         "ts": time.time(),
         "source": reading.source,

@@ -172,6 +172,34 @@
          "RawMax": 12.5,
          "ImageURL": "images/transparent.png",
          "Children": []
+        },
+        {
+         "id": 70,
+         "Text": "CPU Core #1 Thread #1",
+         "Min": "10,0 %",
+         "Value": "10,0 %",
+         "Max": "10,0 %",
+         "SensorId": "/intelcpu/0/load/2",
+         "Type": "Load",
+         "RawMin": 10.0,
+         "RawValue": 10.0,
+         "RawMax": 10.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 71,
+         "Text": "CPU Core #1 Thread #2",
+         "Min": "20,0 %",
+         "Value": "20,0 %",
+         "Max": "20,0 %",
+         "SensorId": "/intelcpu/0/load/3",
+         "Type": "Load",
+         "RawMin": 20.0,
+         "RawValue": 20.0,
+         "RawMax": 20.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
         }
        ]
       },
@@ -295,6 +323,186 @@
          "RawMin": 89.85,
          "RawValue": 89.85,
          "RawMax": 89.85,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      },
+      {
+       "id": 50,
+       "Text": "Levels",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/level.png",
+       "Children": [
+        {
+         "id": 51,
+         "Text": "Life",
+         "Min": "96,0 %",
+         "Value": "96,0 %",
+         "Max": "96,0 %",
+         "SensorId": "/nvme/0/level/20",
+         "Type": "Level",
+         "RawMin": 96.0,
+         "RawValue": 96.0,
+         "RawMax": 96.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 52,
+         "Text": "Available Spare",
+         "Min": "100,0 %",
+         "Value": "100,0 %",
+         "Max": "100,0 %",
+         "SensorId": "/nvme/0/level/25",
+         "Type": "Level",
+         "RawMin": 100.0,
+         "RawValue": 100.0,
+         "RawMax": 100.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 53,
+         "Text": "Available Spare Threshold",
+         "Min": "10,0 %",
+         "Value": "10,0 %",
+         "Max": "10,0 %",
+         "SensorId": "/nvme/0/level/26",
+         "Type": "Level",
+         "RawMin": 10.0,
+         "RawValue": 10.0,
+         "RawMax": 10.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 54,
+         "Text": "Percentage Used",
+         "Min": "4,0 %",
+         "Value": "4,0 %",
+         "Max": "4,0 %",
+         "SensorId": "/nvme/0/level/27",
+         "Type": "Level",
+         "RawMin": 4.0,
+         "RawValue": 4.0,
+         "RawMax": 4.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      },
+      {
+       "id": 55,
+       "Text": "Data",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/data.png",
+       "Children": [
+        {
+         "id": 56,
+         "Text": "Data Read",
+         "Min": "15234,5 GB",
+         "Value": "15234,5 GB",
+         "Max": "15234,5 GB",
+         "SensorId": "/nvme/0/data/21",
+         "Type": "Data",
+         "RawMin": 15234.5,
+         "RawValue": 15234.5,
+         "RawMax": 15234.5,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 57,
+         "Text": "Data Written",
+         "Min": "12045,0 GB",
+         "Value": "12045,0 GB",
+         "Max": "12045,0 GB",
+         "SensorId": "/nvme/0/data/22",
+         "Type": "Data",
+         "RawMin": 12045.0,
+         "RawValue": 12045.0,
+         "RawMax": 12045.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 58,
+         "Text": "Total Space",
+         "Min": "237,5 GB",
+         "Value": "237,5 GB",
+         "Max": "237,5 GB",
+         "SensorId": "/nvme/0/data/32",
+         "Type": "Data",
+         "RawMin": 237.5,
+         "RawValue": 237.5,
+         "RawMax": 237.5,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      },
+      {
+       "id": 59,
+       "Text": "Factors",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/factor.png",
+       "Children": [
+        {
+         "id": 60,
+         "Text": "Power On Hours",
+         "Min": "8760,0 ",
+         "Value": "8760,0 ",
+         "Max": "8760,0 ",
+         "SensorId": "/nvme/0/factor/24",
+         "Type": "Factor",
+         "RawMin": 8760.0,
+         "RawValue": 8760.0,
+         "RawMax": 8760.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 61,
+         "Text": "Power On Count",
+         "Min": "2210,0 ",
+         "Value": "2210,0 ",
+         "Max": "2210,0 ",
+         "SensorId": "/nvme/0/factor/23",
+         "Type": "Factor",
+         "RawMin": 2210.0,
+         "RawValue": 2210.0,
+         "RawMax": 2210.0,
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      },
+      {
+       "id": 62,
+       "Text": "Load",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/load.png",
+       "Children": [
+        {
+         "id": 63,
+         "Text": "Used Space",
+         "Min": "72,4 %",
+         "Value": "72,4 %",
+         "Max": "72,4 %",
+         "SensorId": "/nvme/0/load/30",
+         "Type": "Load",
+         "RawMin": 72.4,
+         "RawValue": 72.4,
+         "RawMax": 72.4,
          "ImageURL": "images/transparent.png",
          "Children": []
         }

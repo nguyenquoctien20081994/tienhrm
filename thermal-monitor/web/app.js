@@ -25,6 +25,8 @@
   const settings = {
     unit: store.get("unit", "C"),
     interval: 15,
+    historyDays: 30,
+    ui: store.get("ui", { style: "hud", theme: "auto" }),
     sound: false,
     thresholds: store.get("thresholds", {}),
     picks: store.get("picks", {}),
@@ -50,6 +52,10 @@
       const s = await r.json();
       settings.unit = s.unit === "F" ? "F" : "C";
       settings.interval = s.interval || 15;
+      settings.historyDays = s.history_days || 30;
+      settings.ui = { style: "hud", theme: "auto", ...(s.ui || {}) };
+      store.set("ui", settings.ui);
+      applyTheme(); updateStyleButton();
       settings.picks = s.picks || {};
       settings.thresholds = s.thresholds || {};
       for (const g of GAUGES) {
@@ -90,7 +96,6 @@
   const gauges = GAUGES.map((cfg) => {
     const el = $("#tplGauge").content.firstElementChild.cloneNode(true);
     el.dataset.key = cfg.key;
-    el.style.setProperty("--accent", cfg.accent);
     $(".code", el).textContent = cfg.code;
     $("h2", el).textContent = cfg.title;
     $("#gauges").appendChild(el);
@@ -114,6 +119,7 @@
 
   // ------------------------------------------------------------------ vẽ tĩnh (vành, mặt số, vạch chia)
   function buildLayers(g) {
+    if (settings.ui.style === "cockpit") return buildTape(g);
     const rect = g.dial.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     const S = Math.round(rect.width * dpr);
@@ -260,8 +266,126 @@
   }
 
   // ------------------------------------------------------------------ vẽ động mỗi khung hình
+  // ------------------------------------------------------------------ kiểu BUỒNG LÁI: thanh đo dọc
+  function buildTape(g) {
+    const rect = g.dial.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const S = Math.round(rect.width * dpr);
+    if (!S) return;
+    g.size = S; g.dpr = dpr;
+    g.dial.width = g.dial.height = S;
+    const sc = scaleOf(g.cfg);
+    const T = { x: S * 0.16, y: S * 0.1, w: S * 0.15, h: S * 0.8 };
+    const yOf = (dv) => T.y + T.h - clamp((dv - sc.min) / (sc.max - sc.min), -0.01, 1.01) * T.h;
+    const c = document.createElement("canvas"); c.width = c.height = S;
+    const x = c.getContext("2d");
+
+    // Tấm kim loại + ốc vít
+    const plate = x.createLinearGradient(0, 0, 0, S);
+    plate.addColorStop(0, "#101b2b"); plate.addColorStop(1, "#04080f");
+    roundRect(x, S * 0.03, S * 0.03, S * 0.94, S * 0.94, S * 0.04); x.fillStyle = plate; x.fill();
+    const rim = x.createLinearGradient(0, 0, S, S);
+    rim.addColorStop(0, "#c7d2df"); rim.addColorStop(0.5, "#3b4656"); rim.addColorStop(1, "#9aa7b6");
+    x.lineWidth = S * 0.012; x.strokeStyle = rim; x.stroke();
+    for (const [sx, sy] of [[0.08, 0.08], [0.92, 0.08], [0.08, 0.92], [0.92, 0.92]]) {
+      const r = S * 0.018, cx = S * sx, cy = S * sy;
+      const sg = x.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+      sg.addColorStop(0, "#f2f5f8"); sg.addColorStop(1, "#4a5260");
+      x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fillStyle = sg; x.fill();
+      x.beginPath(); x.moveTo(cx - r * 0.6, cy); x.lineTo(cx + r * 0.6, cy); x.strokeStyle = "#1a1f27"; x.lineWidth = r * 0.3; x.stroke();
+    }
+    // Lưới nền
+    x.strokeStyle = "rgba(34,229,255,0.05)"; x.lineWidth = 1;
+    for (let i = 1; i < 10; i++) { x.beginPath(); x.moveTo(S * 0.05, S * i / 10); x.lineTo(S * 0.95, S * i / 10); x.stroke(); }
+    // Rãnh thanh đo
+    roundRect(x, T.x - S * 0.012, T.y - S * 0.012, T.w + S * 0.024, T.h + S * 0.024, S * 0.02);
+    x.fillStyle = "#02050a"; x.fill(); x.strokeStyle = "rgba(201,168,106,0.7)"; x.lineWidth = Math.max(1, S * 0.004); x.stroke();
+    // Dải vùng nhiệt bên trái
+    const zones = [[sc.min, conv(g.cfg.warn), g.cfg.accent], [conv(g.cfg.warn), conv(g.cfg.crit), COLORS.amber], [conv(g.cfg.crit), sc.max, COLORS.red]];
+    for (const [a, z, col] of zones) {
+      if (z <= a) continue;
+      x.fillStyle = col; x.globalAlpha = 0.85;
+      x.fillRect(T.x - S * 0.05, yOf(z), S * 0.018, yOf(a) - yOf(z));
+    }
+    x.globalAlpha = 1;
+    // Vạch chia + số
+    for (let v = sc.min; v <= sc.max + 1e-6; v += sc.minor) {
+      const major = Math.abs((v - sc.min) % sc.major) < 1e-6, y = yOf(v);
+      x.beginPath(); x.moveTo(T.x + T.w + S * 0.015, y); x.lineTo(T.x + T.w + S * (major ? 0.06 : 0.035), y);
+      x.strokeStyle = major ? "#e3eefa" : "#5f7590"; x.lineWidth = major ? S * 0.006 : Math.max(1, S * 0.003); x.stroke();
+      if (major) {
+        x.font = `600 ${Math.max(S * 0.04, 9 * dpr)}px ${FONT_UI}`; x.fillStyle = "#c9d9ea";
+        x.textAlign = "left"; x.textBaseline = "middle"; x.fillText(String(v), T.x + T.w + S * 0.075, y);
+      }
+    }
+    // Khung số đọc bên phải
+    roundRect(x, S * 0.5, S * 0.33, S * 0.42, S * 0.24, S * 0.025);
+    x.fillStyle = "rgba(0,0,0,0.6)"; x.fill(); x.strokeStyle = "rgba(201,168,106,0.75)"; x.lineWidth = Math.max(1, S * 0.004); x.stroke();
+    x.font = `600 ${Math.max(S * 0.04, 9 * dpr)}px ${FONT_MONO}`; x.fillStyle = COLORS.muted; x.textAlign = "center";
+    x.fillText(`${g.cfg.key.toUpperCase()} · °${settings.unit}`, S * 0.71, S * 0.29);
+    g.layers = { kind: "tape", bg: c, sc, T, yOf };
+  }
+
+  function drawTape(g, now) {
+    const x = g.dial.getContext("2d");
+    const S = g.size, { sc, T, yOf } = g.layers, t = now / 1000;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.clearRect(0, 0, S, S);
+    x.drawImage(g.layers.bg, 0, 0);
+    const live = g.target != null && !g.stale;
+    const v = g.disp, dv = conv(v), col = live ? colorOf(g.cfg, v) : COLORS.muted;
+    const top = yOf(dv), bottom = T.y + T.h;
+    if (live && bottom > top) {
+      // Cột chất lỏng phát sáng + vệt sáng chạy lên
+      const grad = x.createLinearGradient(0, bottom, 0, top);
+      grad.addColorStop(0, hexA(g.cfg.accent, 0.55)); grad.addColorStop(1, col);
+      x.save(); x.shadowColor = col; x.shadowBlur = S * 0.04;
+      x.fillStyle = grad; x.fillRect(T.x, top, T.w, bottom - top); x.restore();
+      const band = top + ((t * 0.25) % 1) * (bottom - top);
+      const sh = x.createLinearGradient(0, band - S * 0.05, 0, band + S * 0.05);
+      sh.addColorStop(0, "rgba(255,255,255,0)"); sh.addColorStop(0.5, "rgba(255,255,255,0.18)"); sh.addColorStop(1, "rgba(255,255,255,0)");
+      x.fillStyle = sh; x.fillRect(T.x, Math.max(top, band - S * 0.05), T.w, Math.min(S * 0.1, bottom - top));
+    }
+    // Vạch MIN / MAX
+    for (const [val, c] of [[g.min, "#5ad1ff"], [g.max, "#ff6b5a"]]) {
+      if (val == null) continue;
+      const y = yOf(conv(val));
+      x.fillStyle = c; x.fillRect(T.x - S * 0.008, y - S * 0.004, T.w + S * 0.016, S * 0.008);
+    }
+    // Con trỏ hình mũi tên
+    x.save(); x.translate(T.x - S * 0.06, top);
+    x.beginPath(); x.moveTo(S * 0.04, 0); x.lineTo(0, -S * 0.025); x.lineTo(0, S * 0.025); x.closePath();
+    x.fillStyle = live ? "#ff6a3d" : "#55606e"; x.shadowColor = "rgba(0,0,0,0.6)"; x.shadowBlur = S * 0.01; x.fill(); x.restore();
+    // Số đọc
+    x.textAlign = "center"; x.textBaseline = "middle";
+    if (live) {
+      x.font = `700 ${S * 0.13}px ${FONT_MONO}`;
+      x.fillStyle = "rgba(255,255,255,0.06)"; x.fillText("888.8", S * 0.71, S * 0.45);
+      x.fillStyle = col; x.shadowColor = col; x.shadowBlur = S * 0.03; x.fillText(dv.toFixed(1), S * 0.71, S * 0.45); x.shadowBlur = 0;
+    } else {
+      x.font = `700 ${S * 0.06}px ${FONT_MONO}`;
+      x.fillStyle = (Math.floor(t * 2) % 2) ? COLORS.muted : "#34465c";
+      x.fillText(g.stale ? "NO SIGNAL" : g.sensor ? "SLEEP" : "NO SENSOR", S * 0.71, S * 0.45);
+    }
+    // Xu hướng + min/max
+    const tr = trendOf(g);
+    x.font = `600 ${Math.max(S * 0.042, 9 * g.dpr)}px ${FONT_MONO}`;
+    if (tr != null) {
+      const up = tr > 0.3, down = tr < -0.3;
+      x.fillStyle = up ? "#ff8a5a" : down ? "#5ad1ff" : COLORS.muted;
+      x.fillText(`${up ? "▲" : down ? "▼" : "■"} ${(settings.unit === "F" ? tr * 9 / 5 : tr).toFixed(1)}°/min`, S * 0.71, S * 0.64);
+    }
+    x.fillStyle = COLORS.muted;
+    x.fillText(`MIN ${fmt(g.min, 0)}°  MAX ${fmt(g.max, 0)}°`, S * 0.71, S * 0.72);
+    if (live && v >= g.cfg.crit) {
+      roundRect(x, S * 0.03, S * 0.03, S * 0.94, S * 0.94, S * 0.04);
+      x.lineWidth = S * 0.015; x.strokeStyle = `rgba(255,59,78,${0.35 + 0.35 * Math.sin(t * 7)})`; x.stroke();
+    }
+  }
+
   function drawDial(g, now) {
     if (!g.layers) return;
+    if (g.layers.kind === "tape") return drawTape(g, now);
     const x = g.dial.getContext("2d");
     const S = g.size, R = S / 2, sc = g.layers.sc;
     const t = now / 1000;
@@ -512,6 +636,7 @@
     renderTele(snap);
     renderBank(snap);
     checkAlarm();
+    if (fresh) document.dispatchEvent(new CustomEvent("tch:snapshot", { detail: { snap, demo: state.demo } }));
   }
 
   function updateCardText(g) {
@@ -560,6 +685,21 @@
     ab.textContent = hot.length ? `▲ OVERHEAT WARNING ▲  ${hot.map((g) => `${g.cfg.title} ${fmt(g.target)}°${settings.unit}`).join("  ·  ")}` : "";
   }
 
+  // ---- chế độ ngày/đêm và kiểu đồng hồ
+  function applyTheme() {
+    const mode = settings.ui.theme;
+    const h = new Date().getHours();
+    const theme = mode === "auto" ? (h >= 6 && h < 18 ? "day" : "night") : mode;
+    if (document.documentElement.dataset.theme !== theme) {
+      document.documentElement.dataset.theme = theme;
+      document.dispatchEvent(new CustomEvent("tch:theme", { detail: theme }));
+    }
+    $("#btnTheme").textContent = { auto: "◐ AUTO", day: "☀ NGÀY", night: "☾ ĐÊM" }[mode];
+  }
+  function updateStyleButton() {
+    $("#btnStyle").textContent = settings.ui.style === "cockpit" ? "COCKPIT" : "HUD";
+  }
+
   // ---- thanh nhận định tình trạng nhiệt (do app tính, xem assess.py)
   function renderVerdict(a) {
     const box = $("#verdict");
@@ -587,6 +727,9 @@
         if (m.cpu_load != null) out.push(chip("TẢI", `${Math.round(m.cpu_load)}%`, "Mức sử dụng CPU"));
         if (m.cpu_power != null) out.push(chip("CÔNG SUẤT", `${m.cpu_power.toFixed(1)} W`, "Điện năng CPU tiêu thụ"));
         if (m.cpu_clock != null) out.push(chip("XUNG", `${(m.cpu_clock / 1000).toFixed(2)} GHz`, "Xung nhịp trung bình các nhân"));
+        const th = snap.assessment?.throttle;
+        if (th?.state === "thermal") out.push(`<span class="throttle-thermal" title="CPU đang tự giảm xung vì nóng (suy luận từ xung, tải và nhiệt độ)"><i>⚠ HẠ XUNG DO NHIỆT</i>${th.ratio}%</span>`);
+        else if (th?.state === "power") out.push(`<span class="throttle-power" title="Xung thấp hơn mức cao nhất nhưng CPU không nóng: giới hạn điện năng / tiết kiệm pin"><i>GIỚI HẠN XUNG</i>${th.ratio}%</span>`);
         if (m.tjmax != null && s?.value != null) out.push(chip("CÁCH TjMax", `${Math.round(m.tjmax - s.value)}°`,
           `TjMax ${m.tjmax}°C: nhiệt độ mà CPU tự giảm xung để bảo vệ`));
       } else if (g.cfg.key === "gpu") {
@@ -740,6 +883,20 @@
   // ------------------------------------------------------------------ điều khiển
   function rebuildAll() { for (const g of gauges) buildLayers(g); if (state.snap) applySnapshot(state.snap, true); }
 
+  $("#btnStyle").onclick = () => {
+    settings.ui = { ...settings.ui, style: settings.ui.style === "cockpit" ? "hud" : "cockpit" };
+    store.set("ui", settings.ui); saveServer({ ui: settings.ui });
+    updateStyleButton(); rebuildAll();
+  };
+  $("#btnTheme").onclick = () => {
+    const order = ["auto", "night", "day"];
+    settings.ui = { ...settings.ui, theme: order[(order.indexOf(settings.ui.theme) + 1) % order.length] };
+    store.set("ui", settings.ui); saveServer({ ui: settings.ui });
+    applyTheme();
+  };
+  setInterval(applyTheme, 60000);  // chế độ tự động đổi theo giờ (6:00–18:00 là ngày)
+  applyTheme(); updateStyleButton();
+
   const btnUnit = $("#btnUnit");
   btnUnit.textContent = "°" + settings.unit;
   btnUnit.onclick = () => {
@@ -772,7 +929,12 @@
           `<input type="number" step="1" min="30" max="125" data-k="${g.key}" data-f="crit" value="${v.crit}">`;
       }).join("");
   }
-  $("#btnSettings").onclick = () => { fillSettings(); $("#selInterval").value = String(settings.interval); dlg.showModal(); };
+  $("#btnSettings").onclick = () => {
+    fillSettings();
+    $("#selInterval").value = String(settings.interval);
+    $("#selHistory").value = String(settings.historyDays);
+    dlg.showModal();
+  };
   $("#btnReset").onclick = () => fillSettings(true);
   dlg.addEventListener("close", () => {
     if (dlg.returnValue !== "save") return;
@@ -784,7 +946,9 @@
     }
     store.set("thresholds", settings.thresholds);
     settings.interval = Number($("#selInterval").value) || 15;
-    saveServer({ thresholds: settings.thresholds, interval: settings.interval });
+    settings.historyDays = Number($("#selHistory").value) || 30;
+    saveServer({ thresholds: settings.thresholds, interval: settings.interval, history_days: settings.historyDays });
+    document.dispatchEvent(new CustomEvent("tch:settings"));
     rebuildAll();
   });
 
